@@ -88,7 +88,6 @@ static void __create_new_dfile(exe_disk_file_t *dfile, unsigned size,
   klee_prefer_cex(s, s->st_atime == defaults->st_atime);
   klee_prefer_cex(s, s->st_mtime == defaults->st_mtime);
   klee_prefer_cex(s, s->st_ctime == defaults->st_ctime);
-
   s->st_size = dfile->size;
   s->st_blocks = 8;
   dfile->stat = s;
