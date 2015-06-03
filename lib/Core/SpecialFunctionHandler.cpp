@@ -22,6 +22,8 @@
 #include "Executor.h"
 #include "MemoryManager.h"
 
+#include "klee/CommandLine.h"
+
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/Module.h"
 #else
@@ -33,6 +35,15 @@
 
 using namespace llvm;
 using namespace klee;
+
+namespace {
+  cl::opt<bool>
+  ReadablePosix("readable-posix-inputs",
+            cl::init(false),
+            cl::desc("Prefer creation of POSIX inputs (command-line arguments, files, etc.) with human readable bytes. "
+                     "Note: option is expensive when creating lots of tests (default=false)"));
+}
+
 
 /// \todo Almost all of the demands in this file should be replaced
 /// with terminateState calls.
@@ -84,6 +95,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_mark_global", handleMarkGlobal, false),
   add("klee_merge", handleMerge, false),
   add("klee_prefer_cex", handlePreferCex, false),
+  add("klee_posix_prefer_cex", handlePosixPreferCex, false),
   add("klee_print_expr", handlePrintExpr, false),
   add("klee_print_range", handlePrintRange, false),
   add("klee_set_forking", handleSetForking, false),
@@ -323,11 +335,11 @@ SpecialFunctionHandler::readStringAtAddress(ExecutionState &state,
   ref<ConstantExpr> address = cast<ConstantExpr>(addressExpr);
   if (!state.addressSpace.resolveOne(address, op))
     assert(0 && "XXX out of bounds / multiple resolution unhandled");
-  bool res;
-  assert(executor.solver->mustBeTrue(state,
-                                     EqExpr::create(address,
-                                                    op.first->getBaseExpr()),
-                                     res) &&
+  bool res __attribute__ ((unused));
+  assert(executor.solver->mustBeTrue(state, 
+		 EqExpr::create(address,
+		 op.first->getBaseExpr()),
+		 res) &&
          res &&
          "XXX interior pointer unhandled");
   const MemoryObject *mo = op.first;
@@ -477,7 +489,7 @@ void SpecialFunctionHandler::handleAssume(ExecutionState &state,
     e = NeExpr::create(e, ConstantExpr::create(0, e->getWidth()));
   
   bool res;
-  bool success = executor.solver->mustBeFalse(state, e, res);
+  bool success __attribute__ ((unused)) = executor.solver->mustBeFalse(state, e, res);
   assert(success && "FIXME: Unhandled solver failure");
   if (res) {
     executor.terminateStateOnError(state, 
@@ -515,6 +527,13 @@ void SpecialFunctionHandler::handlePreferCex(ExecutionState &state,
          "prefer_cex target must resolve to precisely one object");
 
   rl[0].first.first->cexPreferences.push_back(cond);
+}
+
+void SpecialFunctionHandler::handlePosixPreferCex(ExecutionState &state,
+                                             KInstruction *target,
+                                             std::vector<ref<Expr> > &arguments) {
+  if (ReadablePosix)
+    return handlePreferCex(state, target, arguments);
 }
 
 void SpecialFunctionHandler::handlePrintExpr(ExecutionState &state,
@@ -581,7 +600,7 @@ void SpecialFunctionHandler::handlePrintRange(ExecutionState &state,
   if (!isa<ConstantExpr>(arguments[1])) {
     // FIXME: Pull into a unique value method?
     ref<ConstantExpr> value;
-    bool success = executor.solver->getValue(state, arguments[1], value);
+    bool success __attribute__ ((unused)) = executor.solver->getValue(state, arguments[1], value);
     assert(success && "FIXME: Unhandled solver failure");
     bool res;
     success = executor.solver->mustBeTrue(state, 
@@ -781,7 +800,7 @@ void SpecialFunctionHandler::handleMakeSymbolic(ExecutionState &state,
 
     // FIXME: Type coercion should be done consistently somewhere.
     bool res;
-    bool success =
+    bool success __attribute__ ((unused)) =
       executor.solver->mustBeTrue(*s, 
                                   EqExpr::create(ZExtExpr::create(arguments[1],
                                                                   Context::get().getPointerWidth()),
