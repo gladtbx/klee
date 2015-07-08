@@ -282,7 +282,7 @@ public:
 
 KleeHandler::KleeHandler(int argc, char **argv)
     : m_interpreter(0), m_pathWriter(0), m_symPathWriter(0), m_infoFile(0),
-      m_outputDirectory(), m_numTotalTests(0), m_numGeneratedTests(0),
+      m_outputDirectory(), m_targetFunctions(), m_numTotalTests(0), m_numGeneratedTests(0),
       m_pathsExplored(0), m_argc(argc), m_argv(argv) {
 
   // create output directory (OutputDir or "klee-out-<i>")
@@ -685,7 +685,6 @@ static int initEnv(Module *mainModule) {
   if (!mainFn) {
     klee_error("'%s' function not found in module.", EntryPoint.c_str());
   }
-
   if (mainFn->arg_size() < 2) {
     klee_error("Cannot handle ""--posix-runtime"" when main() has less than two arguments.\n");
   }
@@ -1355,6 +1354,7 @@ int main(int argc, char **argv, char **envp) {
   Interpreter::InterpreterOptions IOpts;
   IOpts.MakeConcreteSymbolic = MakeConcreteSymbolic;
   KleeHandler *handler = new KleeHandler(pArgc, pArgv);
+
   handler->processTargetFunction();
   Interpreter *interpreter = 
     theInterpreter = Interpreter::create(ctx, IOpts, handler);
