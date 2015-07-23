@@ -206,6 +206,18 @@ namespace {
   Watchdog("watchdog",
            cl::desc("Use a watchdog process to enforce --max-time."),
            cl::init(0));
+
+  /*
+   * Gladtbx: input the target function as string, seperate by ",".
+   */
+  cl::opt<std::string>
+  TargetFunction("target-function",cl::desc("Target Function for grading"),cl::init(""));
+
+  cl::opt<bool>
+  OnlyKtestForTarget("onlyKtestForTarget",cl::desc("Generate Ktest for covering target only"));
+
+  cl::opt<bool>
+  ConstructSeedForTarget("constructSeedForTarget",cl::desc("Construct seeds for reaching target function"));
 }
 
 extern cl::opt<double> MaxTime;
@@ -222,6 +234,10 @@ private:
 
   unsigned m_numTotalTests;     // Number of tests received from the interpreter
   unsigned m_numGeneratedTests; // Number of tests successfully generated
+  //Gladtbx: The target Functions.
+  std::vector<std::string> m_targetFunctions;
+
+  unsigned m_testIndex;  // number of tests written so far
   unsigned m_pathsExplored; // number of paths explored so far
 
   // used for writing .ktest files
@@ -257,6 +273,11 @@ public:
                                  std::vector<std::string> &results);
 
   static std::string getRunTimeLibraryPath(const char *argv0);
+  void processTargetFunction();
+  const std::vector<std::string>& getTargetFunction();
+  const bool ifConstructSeedForTarget(){
+	  return ConstructSeedForTarget;
+  }
 };
 
 KleeHandler::KleeHandler(int argc, char **argv)
@@ -396,6 +417,13 @@ void KleeHandler::processTestCase(const ExecutionState &state,
   if (errorMessage && OptExitOnError) {
     m_interpreter->prepareForEarlyExit();
     klee_error("EXITING ON ERROR:\n%s\n", errorMessage);
+  }
+
+  if(OnlyKtestForTarget){
+	  if(!state.targetFunc){
+		  klee_warning("Test case not covering interested function, dropping");
+		  return;
+	  }
   }
 
   if (!NoOutput) {
@@ -601,6 +629,24 @@ std::string KleeHandler::getRunTimeLibraryPath(const char *argv0) {
                        libDir.c_str() << "\n");
   return libDir.str();
 }
+
+void KleeHandler::processTargetFunction(){
+	 std::string targetFunctions = TargetFunction;
+	 while(!targetFunctions.empty()){
+		 int pos=targetFunctions.find_first_of(',');
+		 std::string s = targetFunctions.substr(0,pos);
+		 m_targetFunctions.push_back(s);
+		 if(pos == -1)
+			 	return;
+		 targetFunctions=targetFunctions.substr(pos+1);
+	 }
+	 return;
+}
+
+const std::vector<std::string>& KleeHandler::getTargetFunction(){
+	return m_targetFunctions;
+}
+
 
 //===----------------------------------------------------------------------===//
 // main Driver function
@@ -825,7 +871,7 @@ static const char *unsafeExternals[] = {
   "kill", // mmmhmmm
 };
 #define NELEMS(array) (sizeof(array)/sizeof(array[0]))
-void externalsAndGlobalsCheck(const Module *m) {
+void externalsAndGlobalsCheck(Module *m) {
   std::map<std::string, bool> externals;
   std::set<std::string> modelled(modelledExternals,
                                  modelledExternals+NELEMS(modelledExternals));
@@ -864,6 +910,11 @@ void externalsAndGlobalsCheck(const Module *m) {
                               fnIt->getName().data());
           }
         }
+/*Gladtbx change store is a future work
+        if(const StoreInst *si = dyn_cast<StoreInst>(it)){
+        	klee_warning("Storing: %s",si->getPointerOperand()->getNameStr().c_str());
+        }
+        */
       }
     }
   }
@@ -1304,7 +1355,8 @@ int main(int argc, char **argv, char **envp) {
   Interpreter::InterpreterOptions IOpts;
   IOpts.MakeConcreteSymbolic = MakeConcreteSymbolic;
   KleeHandler *handler = new KleeHandler(pArgc, pArgv);
-  Interpreter *interpreter =
+  handler->processTargetFunction();
+  Interpreter *interpreter = 
     theInterpreter = Interpreter::create(ctx, IOpts, handler);
   handler->setInterpreter(interpreter);
 
@@ -1315,7 +1367,7 @@ int main(int argc, char **argv, char **envp) {
 
   const Module *finalModule =
     interpreter->setModule(mainModule, Opts);
-  externalsAndGlobalsCheck(finalModule);
+  externalsAndGlobalsCheck(const_cast<Module*> (finalModule));
 
   if (ReplayPathFile != "") {
     interpreter->setReplayPath(&replayPath);

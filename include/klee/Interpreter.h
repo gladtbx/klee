@@ -44,6 +44,9 @@ public:
   virtual void processTestCase(const ExecutionState &state,
                                const char *err, 
                                const char *suffix) = 0;
+  virtual const std::vector<std::string>& getTargetFunction() = 0;
+
+  virtual const bool ifConstructSeedForTarget() = 0;
 };
 
 class Interpreter {
