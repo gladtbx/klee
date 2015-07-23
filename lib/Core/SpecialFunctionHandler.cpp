@@ -38,9 +38,8 @@ using namespace klee;
 /// with terminateState calls.
 
 ///
-
-
-
+cl::opt<bool>
+symbolicFileIO("symbolicFileIO",cl::desc("Make File I/O symbolic, including Fopen,Fscanf,Fprintf,Fputs"),cl::init(false));
 // FIXME: We are more or less committed to requiring an intrinsic
 // library these days. We can move some of this stuff there,
 // especially things like realloc which have complicated semantics
@@ -90,6 +89,11 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_alias_function", handleAliasFunction, false),
   add("malloc", handleMalloc, true),
   add("realloc", handleRealloc, true),
+  add("fopen",handleOpen,true),
+  add("klee_make_IO_buffer",handleMakeIOBuffer,false),
+  add("\01__isoc99_fscanf",handleFscanf,true),
+  add("fscanf",handleFscanf,true),
+  add("__isoc99_fscanf",handleFscanf,true),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
@@ -152,8 +156,14 @@ void SpecialFunctionHandler::prepare() {
 
   for (unsigned i=0; i<N; ++i) {
     HandlerInfo &hi = handlerInfo[i];
+    if(hi.name == "fopen"){
+    	  if(!symbolicFileIO){
+    		  handlerInfo[i] = {"",NULL,false,false,false};
+    		  continue;
+    	  }
+    }
     Function *f = executor.kmodule->module->getFunction(hi.name);
-    
+
     // No need to create if the function doesn't exist, since it cannot
     // be called in that case.
   
@@ -223,8 +233,8 @@ SpecialFunctionHandler::readStringAtAddress(ExecutionState &state,
   if (!state.addressSpace.resolveOne(address, op))
     assert(0 && "XXX out of bounds / multiple resolution unhandled");
   bool res;
-  assert(executor.solver->mustBeTrue(state, 
-                                     EqExpr::create(address, 
+  assert(executor.solver->mustBeTrue(state,
+                                     EqExpr::create(address,
                                                     op.first->getBaseExpr()),
                                      res) &&
          res &&
@@ -238,12 +248,12 @@ SpecialFunctionHandler::readStringAtAddress(ExecutionState &state,
   for (i = 0; i < mo->size - 1; i++) {
     ref<Expr> cur = os->read8(i);
     cur = executor.toUnique(state, cur);
-    assert(isa<ConstantExpr>(cur) && 
+    assert(isa<ConstantExpr>(cur) &&
            "hit symbolic char while reading concrete string");
     buf[i] = cast<ConstantExpr>(cur)->getZExtValue(8);
   }
   buf[i] = 0;
-  
+
   std::string result(buf);
   delete[] buf;
   return result;
@@ -744,4 +754,579 @@ void SpecialFunctionHandler::handleDivRemOverflow(ExecutionState &state,
   executor.terminateStateOnError(state,
                                  "overflow on division or remainder",
                                  "overflow.err");
+}
+
+/*
+ * Gladtbx
+ * Dummy Open function, lookup file name and setup file desc for
+ * this file. Syntax: FileID|Buffer|ReadFlag|WriteFlag|Offset
+ */
+void SpecialFunctionHandler::handleOpen(ExecutionState &state,
+        KInstruction *target,
+        std::vector<ref<Expr> > &arguments) {
+		if(arguments.size()!=2){
+			klee_warning("Fopen Parameter Size Wrong");
+			executor.terminateStateOnError(state,
+			                                 "fopen parameter size wrong",
+			                                 "fopen.err");
+		}
+		Executor::ExactResolutionList rl;
+		std::string name = readStringAtAddress(state,arguments[0]);
+		std::string wr = readStringAtAddress(state,arguments[1]);
+		klee_warning("Fopen file name: %s \n",name.c_str());
+		klee_warning("Fopen file type: %s \n",wr.c_str());
+		/*
+		 * Lookup file in buffer
+		 */
+		std::pair<ObjectPair, int> buffer = state.lookupFile(name);
+		assert(buffer.first.first && "File name not found, please use klee_make_IO_buffer to setup filename and buffer");
+
+		int id = state.createFileDesc(buffer,wr);
+
+		klee_warning("Fopen returned id: %d, size: %d\n",id,buffer.second);
+
+		LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+		if (!resultType->isVoidTy()) {
+			TargetData *TD = new TargetData(executor.kmodule->module);
+			uint64_t v = id;
+			unsigned width = TD->getTypeAllocSizeInBits(resultType);
+			ref<Expr> e = ConstantExpr::alloc(v,width);
+			executor.bindLocal(target, state, e);
+		 }
+}
+
+void SpecialFunctionHandler::handleMakeIOBuffer(ExecutionState &state,
+		        KInstruction *target,
+		        std::vector<ref<Expr> > &arguments){
+		assert(arguments.size()==2 && "Wrong number of parameters for klee_make_IO_buffer");
+		std::string filename = readStringAtAddress(state, arguments[1]);
+		Executor::ExactResolutionList rl;
+		executor.resolveExact(state, arguments[0], rl, "mark_IO_buffer");
+	    for (Executor::ExactResolutionList::iterator it = rl.begin(),
+		         ie = rl.end(); it != ie; ++it) {
+	    	ObjectPair op = it->first;
+	    	ExecutionState *s = it->second;
+	    	std::pair<ObjectPair, int> mobuffer(op,op.first->size);
+	    	std::pair<std::pair<ObjectPair, int>, std::string > entry(mobuffer,filename);
+	    	s->addBuffer(entry);
+	    }
+}
+
+uint64_t SpecialFunctionHandler::getValue(ExecutionState &state, ref<Expr> argument){
+	ref<ConstantExpr> value;
+	executor.solver->getValue(state,argument,value);
+	return value.get()->getZExtValue();
+}
+/*
+ * Process number
+ */
+std::vector<std::pair<ExecutionState*, ref<Expr> > > SpecialFunctionHandler::processNumber
+(ExecutionState *current_state, std::vector<ref<Expr> > numberbuf, Expr::Width numwidth,int ary, bool neg){
+	std::vector<std::pair<ExecutionState*, ref<Expr> > > stateNotProcessed;
+	std::vector<std::pair<ExecutionState*, ref<Expr> > > stateProcessed;
+	if(numberbuf.size()==0){
+		return stateNotProcessed;
+	}
+	std::vector<ref<Expr> >::reverse_iterator bufferchar;
+
+	ref<Expr> digit;
+	int mul = 1;
+
+	/*
+	 * if it is a hex.. headache...
+	 */
+	if(ary == 16){
+		ref<Expr> zero = ConstantExpr::create(0,numwidth);
+		ref<Expr> sum;
+		stateNotProcessed.push_back(std::pair<ExecutionState*, ref<Expr> >(current_state,zero));
+		for(bufferchar = numberbuf.rbegin(); bufferchar!=numberbuf.rend();bufferchar++,mul = mul*ary){
+			for(std::vector<std::pair<ExecutionState*, ref<Expr> > >::iterator s= stateNotProcessed.begin(); s != stateNotProcessed.end();s++){
+				ref<Expr> lowerLetter = AndExpr::create(UleExpr::create(ConstantExpr::create('a',ConstantExpr::Int8),*bufferchar),
+				UgeExpr::create(ConstantExpr::create('f',ConstantExpr::Int8),*bufferchar));
+				Executor::StatePair lowerBranch = executor.fork(*(s->first), lowerLetter, true);//fork into new state, first -> true
+				if(lowerBranch.first){//if it is a lower case ascii
+					digit = SubExpr::create(*bufferchar,ConstantExpr::create(87,ConstantExpr::Int8));
+					digit = ZExtExpr::create(digit,numwidth);
+					sum = AddExpr::create(s->second,MulExpr::create(digit,ConstantExpr::create(mul,numwidth)));
+					stateProcessed.push_back(std::pair<ExecutionState*, ref<Expr> > (lowerBranch.first,sum));
+				}
+				if(lowerBranch.second){
+					ref<Expr> upperLetter = AndExpr::create(UleExpr::create(ConstantExpr::create('A',ConstantExpr::Int8),*bufferchar),
+					UgeExpr::create(ConstantExpr::create('F',ConstantExpr::Int8),*bufferchar));
+					Executor::StatePair upperBranch = executor.fork(*lowerBranch.second, upperLetter, true);//fork into new state, first -> true
+					if(upperBranch.first){//if it is an upper ascii
+						digit = SubExpr::create(*bufferchar,ConstantExpr::create(55,ConstantExpr::Int8));
+						digit = ZExtExpr::create(digit,numwidth);
+						sum = AddExpr::create(s->second,MulExpr::create(digit,ConstantExpr::create(mul,numwidth)));
+						stateProcessed.push_back(std::pair<ExecutionState*, ref<Expr> > (upperBranch.first,sum));
+					}
+					if(upperBranch.second){//it is an integer(only option!)
+						digit = SubExpr::create(*bufferchar,ConstantExpr::create(48,ConstantExpr::Int8));
+						digit = ZExtExpr::create(digit,numwidth);
+						sum = AddExpr::create(s->second,MulExpr::create(digit,ConstantExpr::create(mul,numwidth)));
+						stateProcessed.push_back(std::pair<ExecutionState*, ref<Expr> > (upperBranch.second,sum));
+					}
+				}
+			}
+			//now switch buffer.
+			stateNotProcessed.swap(stateProcessed);
+			stateProcessed.clear();
+		}
+		if(neg){
+			for(std::vector<std::pair<ExecutionState*, ref<Expr> > >::iterator s= stateNotProcessed.begin(); s != stateNotProcessed.end();s++){
+				sum = SubExpr::create(ConstantExpr::create(0,numwidth),s->second);
+				s->second = sum;
+			}
+		}
+		return stateNotProcessed;
+	}
+	/*
+	 * if it is octal or decimal
+	 */
+	ref<Expr> sum = ConstantExpr::create(0,numwidth);//Width here is for %d and %i
+	for(bufferchar = numberbuf.rbegin(); bufferchar!=numberbuf.rend();bufferchar++){
+		digit = SubExpr::create(*bufferchar,ConstantExpr::create(48,ConstantExpr::Int8));
+		digit = ZExtExpr::create(digit,numwidth);
+		sum = AddExpr::create(sum,MulExpr::create(digit,ConstantExpr::create(mul,numwidth)));
+		mul= mul * ary;
+	}
+	if(neg){
+		sum = SubExpr::create(ConstantExpr::create(0,numwidth),sum);
+	}
+	stateNotProcessed.push_back(std::pair<ExecutionState*, ref<Expr> >(current_state,sum));
+	return stateNotProcessed;
+}
+/*
+ * Function Pointer for generating conditions.
+ * Conditions has to be generated based on each and every char read, so
+ * better write functions to do them.
+ */
+ref<Expr> SpecialFunctionHandler::IntCondGen(ref<Expr> bufferchar){
+	ref<Expr> left = UltExpr::create(ConstantExpr::create(47,ConstantExpr::Int8),bufferchar);
+	ref<Expr> right = UgtExpr::create(ConstantExpr::create(58,ConstantExpr::Int8),bufferchar);
+	ref<Expr> cond = AndExpr::create(left,right);
+	return cond;
+}
+
+ref<Expr> SpecialFunctionHandler::OctCondGen(ref<Expr> bufferchar){
+	ref<Expr> left = UltExpr::create(ConstantExpr::create(47,ConstantExpr::Int8),bufferchar);
+	ref<Expr> right = UgtExpr::create(ConstantExpr::create(56,ConstantExpr::Int8),bufferchar);
+	ref<Expr> cond = AndExpr::create(left,right);
+	return cond;
+}
+/*
+ * Function Pointer for generating conditions.
+ * Conditions has to be generated based on each and every char read, so
+ * better write functions to do them.
+ */
+ref<Expr> SpecialFunctionHandler::HexCondGen(ref<Expr> bufferchar){
+	ref<Expr> left = UltExpr::create(ConstantExpr::create(47,ConstantExpr::Int8),bufferchar);
+	ref<Expr> right = UgtExpr::create(ConstantExpr::create(58,ConstantExpr::Int8),bufferchar);
+	ref<Expr> digit = AndExpr::create(left,right);
+	ref<Expr> lowerLetter = AndExpr::create(UleExpr::create(ConstantExpr::create('a',ConstantExpr::Int8),bufferchar),
+			UgeExpr::create(ConstantExpr::create('f',ConstantExpr::Int8),bufferchar));
+	ref<Expr> upperLetter = AndExpr::create(UleExpr::create(ConstantExpr::create('A',ConstantExpr::Int8),bufferchar),
+					UgeExpr::create(ConstantExpr::create('F',ConstantExpr::Int8),bufferchar));
+	ref<Expr> cond = OrExpr::create(OrExpr::create(digit,lowerLetter),upperLetter);
+	return cond;
+}
+
+void SpecialFunctionHandler::processScan(ExecutionState *current_state,Expr::Width w,ref<Expr> bufferchar,
+			ref<Expr> targetBuf,const int fileid, const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed,
+			KInstruction *target, int bytesread, int ary, ref<Expr> (*condFunc) (ref<Expr>)){
+	/*
+	 * Condition should be:
+	 * if buffer lasts (size)
+	 */
+	while(current_state){
+		/*
+		 * 47 < digit < 58, determine if digit is a number in ascii
+		 */
+		ref<Expr> cond = condFunc(bufferchar);
+		Executor::StatePair branches = executor.fork(*current_state, cond, true);//fork into new state, first -> true
+		if(branches.second){//if it is not a digit
+			std::vector<ref<Expr> > numberbuf = branches.second->ioBuffer.getBuffer();
+			bool neg = branches.second->ioBuffer.getNeg();
+			std::vector<std::pair<ExecutionState*, ref<Expr> > > result =  processNumber
+			(branches.second, numberbuf, w, ary, neg);
+			//ref<Expr> result = branches.second->ioBuffer.processNumber(w, ary);
+			if(result.empty()){//if there is no digit read.
+				//set the return value to be arguments read. Do not process any more.
+				LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+				if (!resultType->isVoidTy()) {
+					TargetData *TD = new TargetData(executor.kmodule->module);
+					unsigned width = TD->getTypeAllocSizeInBits(resultType);
+					ref<Expr> e;
+					if(bytesread == 0)
+						e = ConstantExpr::alloc(EOF,width);
+					else
+						e = ConstantExpr::alloc(bytesread,width);
+					executor.bindLocal(target, *branches.second, e);
+				 }
+			}
+			else{
+				for(std::vector<std::pair<ExecutionState*, ref<Expr> > >::iterator rs= result.begin(); rs != result.end();rs++){
+					executor.executeMemoryOperation(*(rs->first),true,targetBuf,rs->second,0);//bind result with target
+					stateProcessed->push_back(rs->first);//put into statequeue.
+				}
+			}
+		}
+		if(branches.first){//if it is a digit.
+			branches.first->ioBuffer.addDigit(bufferchar);//add digit to ExecutionState.
+			ExecutionState::fileDesc* local_desc = branches.first->getBuffer(fileid);
+			if(local_desc->getoffset() >= local_desc->getsize()){
+				//return EOF
+				LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+				if (!resultType->isVoidTy()) {
+					TargetData *TD = new TargetData(executor.kmodule->module);
+					unsigned width = TD->getTypeAllocSizeInBits(resultType);
+					ref<Expr> e;
+					if(bytesread == 0)
+						e = ConstantExpr::alloc(EOF,width);
+					else
+						e = ConstantExpr::alloc(bytesread,width);
+					executor.bindLocal(target, *branches.first, e);
+				 }
+				return;//no more to read
+			}
+			bufferchar = op.second->read8(local_desc->getoffset());//read next char
+			local_desc->incOffset();
+		}
+		current_state = branches.first;
+	}
+}
+
+void SpecialFunctionHandler::processScanInt(ExecutionState *current_state,Expr::Width w,ref<Expr> bufferchar,
+			ref<Expr> targetBuf,const int fileid, const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed, KInstruction *target, int bytesread){
+		processScan(current_state, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, bytesread, 10, &IntCondGen);
+}
+
+void SpecialFunctionHandler::processScanOct(ExecutionState *current_state,Expr::Width w,ref<Expr> bufferchar,
+			ref<Expr> targetBuf,const int fileid, const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed, KInstruction *target, int bytesread){
+		processScan(current_state, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, bytesread, 8, &OctCondGen);
+}
+
+void SpecialFunctionHandler::processScanHex(ExecutionState *current_state,Expr::Width w,
+		ref<Expr> bufferchar, ref<Expr> targetBuf, const int fileid,
+		const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed,
+		KInstruction *target, int bytesread){
+	/*
+	 * If it is 0x, takes care of it
+	 */
+	ref<Expr> zeroEq = EqExpr::create(ConstantExpr::create('0',ConstantExpr::Int8),bufferchar);
+	Executor::StatePair zeroBranch = executor.fork(*current_state, zeroEq, true);//fork into new state, first -> true
+	if(zeroBranch.first){//if it is a zero at front
+		ExecutionState::fileDesc* local_desc = zeroBranch.first->getBuffer(fileid);
+		if(local_desc->getoffset() >= local_desc->getsize()){
+			zeroBranch.first->ioBuffer.addDigit(bufferchar);
+			//In this case, the previos read zero is the hex value, so we should bind it to the target.
+			bytesread++;
+			ref<Expr> result = zeroBranch.first->ioBuffer.processNumber(w, 16);//We don't need to check for Null because we just pushed.
+			executor.executeMemoryOperation(*(zeroBranch.first),true,targetBuf,result,0);//bind result with target
+			//return EOF as there is no more to read
+			LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+			if (!resultType->isVoidTy()) {
+				TargetData *TD = new TargetData(executor.kmodule->module);
+				unsigned width = TD->getTypeAllocSizeInBits(resultType);
+				ref<Expr> e;
+				e = ConstantExpr::alloc(bytesread,width);
+				executor.bindLocal(target, *zeroBranch.first, e);
+			 }
+			//no more to read
+		}
+		else{//if there is more buffer to read, we read first
+			bufferchar = op.second->read8(local_desc->getoffset());//read next char
+			local_desc->incOffset();
+			ref<Expr> xEq = OrExpr::create(EqExpr::create(ConstantExpr::create('x',ConstantExpr::Int8),bufferchar),
+					EqExpr::create(ConstantExpr::create('X',ConstantExpr::Int8),bufferchar));//bufferchar== x||bufferchar==X
+			Executor::StatePair xBranch = executor.fork(*zeroBranch.first, xEq, true);//fork into new state, first -> true
+			if(xBranch.first){//if it is an x or X, so 0x or 0X in front
+				ExecutionState::fileDesc* local_desc = zeroBranch.first->getBuffer(fileid);
+				/*
+				 * if it is an 0x or 0X header, we check if there is more buffer to read.
+				 */
+				if(local_desc->getoffset() >= local_desc->getsize()){
+					//if no more buffer to read
+					//return EOF
+					LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+					if (!resultType->isVoidTy()) {
+						TargetData *TD = new TargetData(executor.kmodule->module);
+						unsigned width = TD->getTypeAllocSizeInBits(resultType);
+						ref<Expr> e;
+						if(bytesread == 0)
+							e = ConstantExpr::alloc(EOF,width);
+						else
+							e = ConstantExpr::alloc(bytesread,width);
+						executor.bindLocal(target, *xBranch.first, e);
+					 }
+				}
+				else{
+					//there is more to read.
+					bufferchar = op.second->read8(local_desc->getoffset());//read next char
+					local_desc->incOffset();
+					/*
+					 * If digit is between 0-9 or a-f or A-F
+					 */
+
+					processScan(xBranch.first, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, bytesread, 16, &HexCondGen);
+				}
+			}
+			if(xBranch.second){
+				//if it is not followed by an x, we put this zero back to the digit pool of the state.
+				xBranch.second->ioBuffer.addDigit(bufferchar);
+				/*
+				 * If digit is between 0-9 or a-f or A-F
+				 */
+				processScan(xBranch.second, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, bytesread, 16, &HexCondGen);
+			}
+		}
+	}
+	if(zeroBranch.second){
+		//Easy case, no 0x or 0X header
+		/*
+		 * If digit is between 0-9 or a-f or A-F
+		 */
+		processScan(zeroBranch.second, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, bytesread, 16, &HexCondGen);
+	}
+}
+
+
+
+void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
+        KInstruction *target,
+        std::vector<ref<Expr> > &arguments){
+		assert(arguments.size()>1 && "Wrong number of arguments for fscanf");
+		std::string format = readStringAtAddress(state,arguments[1]);
+		ref<ConstantExpr> value;
+		executor.solver->getValue(state,arguments[0],value);
+		int fileid = value.get()->getZExtValue();
+		klee_warning("Fileid: %d", fileid);
+		klee_warning("Format String: %s", format.c_str());
+		/*
+		 * Start reading from the buffer
+		 */
+		ExecutionState::fileDesc* descriptor = state.getBuffer(fileid);
+		ObjectPair op = descriptor->getBuffer();
+		const ObjectState* os = op.second;
+		const MemoryObject* mo = op.first;
+		int size = descriptor->getsize();
+		std::string::iterator it;
+		ref<ConstantExpr> bufferLocation = mo->getBaseExpr();
+
+		/*
+		 * First we resolve the content of the symbolic input.
+		 * This may fork new states as different versions of input may be reached here.
+		 * We do not need to resolve the buffers that are read to as it is going to be written any way
+		 */
+		Executor::ExactResolutionList rl;
+		executor.resolveExact(state, bufferLocation, rl, "fscanf");
+		for (Executor::ExactResolutionList::iterator erit = rl.begin(),
+				 erie = rl.end(); erit != erie; ++erit) {
+			ObjectPair op = erit->first;
+			ExecutionState *sinit = erit->second;
+			sinit->ioBuffer.clear();//For each new scan, clear the ioBuffer.
+			bool result;
+			int bytesread = 0;
+			std::vector<ExecutionState*> stateNotProcessed;
+			std::vector<ExecutionState*> stateProcessed;
+			stateNotProcessed.push_back(sinit);
+			/*
+			 * After resolving symbolic input, we start reading one by one.
+			 */
+			for(it = format.begin();it!=format.end();it++){
+				for(std::vector<ExecutionState*>::iterator s= stateNotProcessed.begin(); s != stateNotProcessed.end();s++){
+					//for(every s in stateNotProcessed)
+					descriptor = (*s)->getBuffer(fileid);
+					if(descriptor->getoffset()>=size){
+								//return EOF
+						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						if (!resultType->isVoidTy()) {
+							TargetData *TD = new TargetData(executor.kmodule->module);
+							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							ref<Expr> e;
+							if(bytesread == 0)
+								e = ConstantExpr::alloc(EOF,width);
+							else
+								e = ConstantExpr::alloc(bytesread,width);
+							executor.bindLocal(target, **s, e);
+						 }
+						continue;
+					}
+					//if we are not out of buffer, we read the content of the buffer.
+					ref<Expr> bufferchar = op.second->read8(descriptor->getoffset());
+					descriptor->incOffset();
+					if(*it == '%'){//Read to dest
+						int argNum = bytesread+2;
+						if(argNum >= arguments.size()){
+							//Not enough parameters to be read to.
+							klee_warning("Not enough parameter to be put char in");
+							//set return to bytesread
+							LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+							if (!resultType->isVoidTy()) {
+								TargetData *TD = new TargetData(executor.kmodule->module);
+								unsigned width = TD->getTypeAllocSizeInBits(resultType);
+								ref<Expr> e;
+								if(bytesread == 0)
+									e = ConstantExpr::alloc(EOF,width);
+								else
+									e = ConstantExpr::alloc(bytesread,width);
+								executor.bindLocal(target, **s, e);
+							 }
+							continue;
+						}
+						ref<Expr> targetBuf = arguments[argNum];//how to write?
+
+						/*
+						 * We need to check if the dest buffer have the correct type.
+						 */
+						//it now is the first char of specifier
+						char specifier[3]={'\0','\0','\0'};
+						int index = 0;
+						it++;
+
+						specifier[index] = *it;
+						//first check if it is length. include'l','ll','L','h','hh','j','z','t'
+						if(*it == 'l' || *it == 'h' || *it == 'j' || *it == 'z' || *it == 't' || *it == 'L'){
+							it++;//add checking for it not out of bound
+							if(it == format.end()){
+								klee_warning("Fscanf missing indicator before reaching end of string");
+								//return
+							}
+							index++;
+							specifier[index] = *it;
+							if(specifier[0] == specifier[1]){
+								//we have 'hh' or 'll' and still need one more char
+								it++;
+								index++;
+								specifier[index] = *it;
+							}
+						}
+						//if no length is found we have the specifier we need
+						//check %f
+						/*
+						 * %d || %i
+						 */
+						if(specifier[0] == 'd' || specifier[0] == 'o' ){
+							//check negative sign
+							ref<Expr> cond = EqExpr::create(ConstantExpr::create((uint64_t) '-',ConstantExpr::Int8), bufferchar);
+							Executor::StatePair signbranches = executor.fork(**s, cond, true);//fork into new state, first -> true
+							if(signbranches.first){//if negative
+								signbranches.first->ioBuffer.setneg();
+								ExecutionState::fileDesc* local_desc = signbranches.first->getBuffer(fileid);
+								if(local_desc->getoffset() >= size){
+									//return EOF
+									LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+									if (!resultType->isVoidTy()) {
+										TargetData *TD = new TargetData(executor.kmodule->module);
+										unsigned width = TD->getTypeAllocSizeInBits(resultType);
+										ref<Expr> e;
+										if(bytesread == 0)
+											e = ConstantExpr::alloc(EOF,width);
+										else
+											e = ConstantExpr::alloc(bytesread,width);
+										executor.bindLocal(target, *signbranches.first, e);
+									 }
+								}
+								bufferchar = op.second->read8(local_desc->getoffset());//read next char
+								local_desc->incOffset();
+								if(specifier[0] == 'd')
+									processScanInt(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target,bytesread);
+								else
+									processScanOct(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target,bytesread);
+							}
+
+							if(signbranches.second){//if positive
+								if(specifier[0] == 'd')
+									processScanInt(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target,bytesread);
+								else
+									processScanOct(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target,bytesread);
+							}
+							bytesread++;
+						}
+						else if(specifier[0] == 'i'){
+
+						}
+						else if(specifier[0] == 'x'){
+							//check negative sign
+							ref<Expr> cond = EqExpr::create(ConstantExpr::create((uint64_t) '-',ConstantExpr::Int8), bufferchar);
+							Executor::StatePair signbranches = executor.fork(**s, cond, true);//fork into new state, first -> true
+							if(signbranches.first){//if negative
+								signbranches.first->ioBuffer.setneg();
+								ExecutionState::fileDesc* local_desc = signbranches.first->getBuffer(fileid);
+								if(local_desc->getoffset() >= size){
+									//return EOF
+									LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+									if (!resultType->isVoidTy()) {
+										TargetData *TD = new TargetData(executor.kmodule->module);
+										unsigned width = TD->getTypeAllocSizeInBits(resultType);
+										ref<Expr> e;
+										if(bytesread == 0)
+											e = ConstantExpr::alloc(EOF,width);
+										else
+											e = ConstantExpr::alloc(bytesread,width);
+										executor.bindLocal(target, *signbranches.first, e);
+									 }
+								}
+								bufferchar = op.second->read8(local_desc->getoffset());//read next char
+								local_desc->incOffset();
+								processScanHex(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target,bytesread);
+							}
+
+							if(signbranches.second){//if positive
+								processScanHex(signbranches.second,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target,bytesread);
+							}
+							bytesread++;
+						}
+						else if(specifier[0] == 'u'){
+
+						}
+					}
+
+					else if(*it =='\t'||*it == '\n' ||*it == '\v' || *it== '\f' || *it == '\r' ){//add tab space etc..
+						continue;
+					}
+					else{
+						ref<ConstantExpr> formatchar = ConstantExpr::create((uint64_t)*it,ConstantExpr::Int8);
+						bool success =	executor.solver->mustBeTrue(**s,EqExpr::create(formatchar,bufferchar),result);//Gladtbx: Must be true OR May be true, it is a question.
+						assert(success && "fscanf solver failure");
+						if(result){
+							//a match can be found so we move on...
+							stateProcessed.push_back(*s);
+						}
+						else{
+							klee_warning("Fscanf found string not able to match!!");
+							//return num of chars read.
+							LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+							if (!resultType->isVoidTy()) {
+								TargetData *TD = new TargetData(executor.kmodule->module);
+								unsigned width = TD->getTypeAllocSizeInBits(resultType);
+								ref<Expr> e;
+								if(bytesread == 0)
+									e = ConstantExpr::alloc(EOF,width);
+								else
+									e = ConstantExpr::alloc(bytesread,width);
+								executor.bindLocal(target, **s, e);
+							 }
+						}
+					}
+				}
+				//now switch buffer.
+				stateNotProcessed.swap(stateProcessed);
+				stateProcessed.clear();
+			}
+			//after processed every literal in the format string, return bytes read for each state inside not processed_state.
+			for(std::vector<ExecutionState*>::iterator s= stateNotProcessed.begin(); s != stateNotProcessed.end();s++){
+				LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+				if (!resultType->isVoidTy()) {
+					TargetData *TD = new TargetData(executor.kmodule->module);
+					unsigned width = TD->getTypeAllocSizeInBits(resultType);
+					ref<Expr> e;
+					if(bytesread == 0)
+						e = ConstantExpr::alloc(EOF,width);
+					else
+						e = ConstantExpr::alloc(bytesread,width);
+					executor.bindLocal(target, **s, e);
+				 }
+			}
+		}
 }

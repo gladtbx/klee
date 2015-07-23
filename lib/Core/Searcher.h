@@ -69,6 +69,7 @@ namespace klee {
     enum CoreSearchType {
       DFS,
       BFS,
+      TargetSearcher,
       RandomState,
       RandomPath,
       NURS_CovNew,
@@ -78,6 +79,20 @@ namespace klee {
       NURS_CPICnt,
       NURS_QC
     };
+  };
+
+  class TargetSearcher : public Searcher{
+	  std::vector<ExecutionState*> states;
+	  std::vector<ExecutionState*> targetStates;
+  public:
+	  ExecutionState &selectState();
+	  void update(ExecutionState *current,
+			  const std::set<ExecutionState*> &addedStates,
+			  const std::set<ExecutionState*> &removedStates);
+	  bool empty() { return (targetStates.empty() && states.empty()); }
+	  void printName(llvm::raw_ostream &os) {
+		  os << "TargetSearcher\n";
+	  }
   };
 
   class DFSSearcher : public Searcher {

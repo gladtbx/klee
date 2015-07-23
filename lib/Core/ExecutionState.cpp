@@ -77,7 +77,9 @@ ExecutionState::ExecutionState(KFunction *kf) :
     instsSinceCovNew(0),
     coveredNew(false),
     forkDisabled(false),
-    ptreeNode(0) {
+    ptreeNode(0),
+    targetFunc(false)
+{
   pushFrame(0, kf);
 }
 
@@ -120,7 +122,12 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     coveredLines(state.coveredLines),
     ptreeNode(state.ptreeNode),
     symbolics(state.symbolics),
-    arrayNames(state.arrayNames)
+    arrayNames(state.arrayNames),
+	targetFunc(state.targetFunc),
+	ioBuffer(state.ioBuffer),
+	fileDescriptor(state.fileDescriptor),
+	bufferList(state.bufferList)
+
 {
   for (unsigned int i=0; i<symbolics.size(); i++)
     symbolics[i].first->refCount++;

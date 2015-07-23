@@ -62,10 +62,60 @@ Searcher::~Searcher() {
 }
 
 ///
+ExecutionState &TargetSearcher::selectState(){
+	if(!targetStates.empty()){
+		return *targetStates.back();
+	}
+	return *states.back();
+}
+
+void TargetSearcher::update(ExecutionState *current, const std::set<ExecutionState*> &addedStates,
+		const std::set<ExecutionState*> &removedStates) {
+	for(std::set<ExecutionState*>::iterator it = addedStates.begin(), ie = addedStates.end();it != ie; ++it){
+		if((*it)->targetFunc){
+			targetStates.insert(states.end(),*it);
+		}
+		else{
+			states.insert(states.end(),*it);
+		}
+	}
+	for (std::set<ExecutionState*>::const_iterator it = removedStates.begin(),
+			ie = removedStates.end(); it != ie; ++it) {
+		ExecutionState *es = *it;
+		if (es == states.back()) {
+			states.pop_back();
+		} else if(es == targetStates.back()){
+			targetStates.pop_back();
+		}
+		else{
+			bool ok = false;
+			for (std::vector<ExecutionState*>::iterator it = states.begin(),
+					ie = states.end(); it != ie; ++it) {
+				if (es==*it) {
+					states.erase(it);
+					ok = true;
+					break;
+				}
+			}
+			if(!ok){
+				for (std::vector<ExecutionState*>::iterator it = targetStates.begin(),
+						ie = targetStates.end(); it != ie; ++it) {
+					if (es==*it) {
+						targetStates.erase(it);
+						ok = true;
+						break;
+					}
+				}
+			}
+			assert(ok && "invalid state removed");
+		}
+	}
+}
 
 ExecutionState &DFSSearcher::selectState() {
   return *states.back();
 }
+
 
 void DFSSearcher::update(ExecutionState *current,
                          const std::set<ExecutionState*> &addedStates,
@@ -615,3 +665,4 @@ void InterleavedSearcher::update(ExecutionState *current,
          ie = searchers.end(); it != ie; ++it)
     (*it)->update(current, addedStates, removedStates);
 }
+

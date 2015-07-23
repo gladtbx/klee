@@ -120,7 +120,7 @@ namespace {
   cl::opt<bool>
   ExitOnError("exit-on-error", 
               cl::desc("Exit if errors occur"));
-    
+
 
   enum LibcType {
     NoLibc, KleeLibc, UcLibc
@@ -203,6 +203,18 @@ namespace {
   Watchdog("watchdog",
            cl::desc("Use a watchdog process to enforce --max-time."),
            cl::init(0));
+
+  /*
+   * Gladtbx: input the target function as string, seperate by ",".
+   */
+  cl::opt<std::string>
+  TargetFunction("target-function",cl::desc("Target Function for grading"),cl::init(""));
+
+  cl::opt<bool>
+  OnlyKtestForTarget("onlyKtestForTarget",cl::desc("Generate Ktest for covering target only"));
+
+  cl::opt<bool>
+  ConstructSeedForTarget("constructSeedForTarget",cl::desc("Construct seeds for reaching target function"));
 }
 
 extern cl::opt<double> MaxTime;
@@ -216,6 +228,9 @@ private:
   llvm::raw_ostream *m_infoFile;
 
   SmallString<128> m_outputDirectory;
+
+  //Gladtbx: The target Functions.
+  std::vector<std::string> m_targetFunctions;
 
   unsigned m_testIndex;  // number of tests written so far
   unsigned m_pathsExplored; // number of paths explored so far
@@ -256,6 +271,11 @@ public:
 			  std::vector<std::string> &results);
 
   static std::string getRunTimeLibraryPath(const char *argv0);
+  void processTargetFunction();
+  const std::vector<std::string>& getTargetFunction();
+  const bool ifConstructSeedForTarget(){
+	  return ConstructSeedForTarget;
+  }
 };
 
 KleeHandler::KleeHandler(int argc, char **argv) 
@@ -264,6 +284,7 @@ KleeHandler::KleeHandler(int argc, char **argv)
     m_symPathWriter(0),
     m_infoFile(0),
     m_outputDirectory(),
+    m_targetFunctions(),
     m_testIndex(0),
     m_pathsExplored(0),
     m_argc(argc),
@@ -409,6 +430,13 @@ void KleeHandler::processTestCase(const ExecutionState &state,
   if (errorMessage && ExitOnError) {
     llvm::errs() << "EXITING ON ERROR:\n" << errorMessage << "\n";
     exit(1);
+  }
+
+  if(OnlyKtestForTarget){
+	  if(!state.targetFunc){
+		  klee_warning("Test case not covering interested function, dropping");
+		  return;
+	  }
   }
 
   if (!NoOutput) {
@@ -609,6 +637,24 @@ std::string KleeHandler::getRunTimeLibraryPath(const char *argv0) {
                        libDir.c_str() << "\n");
   return libDir.str();
 }
+
+void KleeHandler::processTargetFunction(){
+	 std::string targetFunctions = TargetFunction;
+	 while(!targetFunctions.empty()){
+		 int pos=targetFunctions.find_first_of(',');
+		 std::string s = targetFunctions.substr(0,pos);
+		 m_targetFunctions.push_back(s);
+		 if(pos == -1)
+			 	return;
+		 targetFunctions=targetFunctions.substr(pos+1);
+	 }
+	 return;
+}
+
+const std::vector<std::string>& KleeHandler::getTargetFunction(){
+	return m_targetFunctions;
+}
+
 
 //===----------------------------------------------------------------------===//
 // main Driver function
@@ -838,7 +884,7 @@ static const char *unsafeExternals[] = {
   "kill", // mmmhmmm
 };
 #define NELEMS(array) (sizeof(array)/sizeof(array[0]))
-void externalsAndGlobalsCheck(const Module *m) {
+void externalsAndGlobalsCheck(Module *m) {
   std::map<std::string, bool> externals;
   std::set<std::string> modelled(modelledExternals, 
                                  modelledExternals+NELEMS(modelledExternals));
@@ -878,6 +924,11 @@ void externalsAndGlobalsCheck(const Module *m) {
                               fnIt->getName().data());
           }
         }
+/*Gladtbx change store is a future work
+        if(const StoreInst *si = dyn_cast<StoreInst>(it)){
+        	klee_warning("Storing: %s",si->getPointerOperand()->getNameStr().c_str());
+        }
+        */
       }
     }
   }
@@ -1355,6 +1406,7 @@ int main(int argc, char **argv, char **envp) {
   Interpreter::InterpreterOptions IOpts;
   IOpts.MakeConcreteSymbolic = MakeConcreteSymbolic;
   KleeHandler *handler = new KleeHandler(pArgc, pArgv);
+  handler->processTargetFunction();
   Interpreter *interpreter = 
     theInterpreter = Interpreter::create(IOpts, handler);
   handler->setInterpreter(interpreter);
@@ -1365,9 +1417,9 @@ int main(int argc, char **argv, char **envp) {
   }
   infoFile << "PID: " << getpid() << "\n";
 
-  const Module *finalModule = 
+  const Module *finalModule =
     interpreter->setModule(mainModule, Opts);
-  externalsAndGlobalsCheck(finalModule);
+  externalsAndGlobalsCheck(const_cast<Module*> (finalModule));
 
   if (ReplayPathFile != "") {
     interpreter->setReplayPath(&replayPath);

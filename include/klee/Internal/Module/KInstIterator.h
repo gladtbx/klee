@@ -7,6 +7,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "klee/Internal/Module/KInstruction.h"
+#include "llvm/Instruction.h"
+#include "llvm/BasicBlock.h"
+#include "llvm/Function.h"
+
 #ifndef KLEE_KINSTITERATOR_H
 #define KLEE_KINSTITERATOR_H
 
@@ -43,6 +48,9 @@ namespace klee {
     operator bool() const { return it != 0; }
 
     KInstruction *operator ->() const { return *it; }
+    std::string getFuncName() const{
+    	return (*it)->inst->getParent()->getParent()->getNameStr();
+    }
   };
 } // End klee namespace
 

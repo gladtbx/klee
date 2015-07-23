@@ -395,6 +395,21 @@ private:
   void initTimers();
   void processTimers(ExecutionState *current,
                      double maxInstTime);
+
+  bool ifTargetFunction(const llvm::Function *f){
+	  if(!f){
+//		  klee_warning("Gladtbx: Null pointer in ifTargetFunction encounter");
+		  return false;
+	  }
+	  std::string functionName=f->getNameStr();
+	  std::vector<std::string> targetFunctions = interpreterHandler->getTargetFunction();
+	  for(std::vector<std::string>::iterator it= targetFunctions.begin(), ie = targetFunctions.end(); it != ie; it++){
+		  if(functionName == *it)
+		  	 return true;
+	  }
+	  return false;
+  }
+
                 
 public:
   Executor(const InterpreterOptions &opts, InterpreterHandler *ie);

@@ -639,7 +639,7 @@ void Executor::branch(ExecutionState &state,
     // XXX do proper balance or keep random?
     result.push_back(&state);
     for (unsigned i=1; i<N; ++i) {
-      ExecutionState *es = result[theRNG.getInt32() % i];
+      ExecutionState *es = result[i-1];//Gladtbx: changed from random to linear, only affects weight
       ExecutionState *ns = es->branch();
       addedStates.insert(ns);
       result.push_back(ns);
@@ -702,7 +702,12 @@ void Executor::branch(ExecutionState &state,
     if (result[i])
       addConstraint(*result[i], conditions[i]);
 }
-
+/*
+ * Gladtbx:First evaluate the condition.
+ * Then if concrete true or false, we don't fork
+ * Else if both true or false can be reached. We split
+ * current ExecutionState, and add state/condition pair.
+ */
 Executor::StatePair 
 Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
   Solver::Validity res;
@@ -771,7 +776,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       }
     } else if (res==Solver::Unknown) {
       assert(!replayOut && "in replay mode, only one branch can be true.");
-      
+      //If we are at memory limit, we skip forking.
       if ((MaxMemoryInhibit && atMemoryLimit) || 
           current.forkDisabled ||
           inhibitForking || 
@@ -787,6 +792,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
 	  klee_warning_once(0, "skipping fork (max-forks reached)");
 
         TimerStatIncrementer timer(stats::forkTime);
+        //Setting current execution to one path.
         if (theRNG.getBool()) {
           addConstraint(current, condition);
           res = Solver::True;        
@@ -944,7 +950,7 @@ void Executor::addConstraint(ExecutionState &state, ref<Expr> condition) {
   if (it != seedMap.end()) {
     bool warn = false;
     for (std::vector<SeedInfo>::iterator siit = it->second.begin(), 
-           siie = it->second.end(); siit != siie; ++siit) {
+           siie = it->second.end(); siit != siie; ++siit) {//Gladtbx: loop through vector of SeedInfo
       bool res;
       bool success = 
         solver->mustBeFalse(state, siit->assignment.evaluate(condition), res);
@@ -1173,6 +1179,7 @@ void Executor::executeCall(ExecutionState &state,
                            std::vector< ref<Expr> > &arguments) {
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {
+	 klee_warning(f->getNameStr().c_str());
     switch(f->getIntrinsicID()) {
     case Intrinsic::not_intrinsic:
       // state may be destroyed by this call, cannot touch
@@ -1421,12 +1428,16 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
+  //i->getParent()->getParent()->dump();
+  //i->dump();//Gladtbx:switch
+  //klee_warning(i->getNameStr().c_str());
   switch (i->getOpcode()) {
     // Control flow
   case Instruction::Ret: {
     ReturnInst *ri = cast<ReturnInst>(i);
     KInstIterator kcaller = state.stack.back().caller;
     Instruction *caller = kcaller ? kcaller->inst : 0;
+    //Gladtbx: when returning, we check if the caller function is target?
     bool isVoidReturn = (ri->getNumOperands() == 0);
     ref<Expr> result = ConstantExpr::alloc(0, Expr::Bool);
     
@@ -1543,6 +1554,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     BasicBlock *bb = si->getParent();
 
     cond = toUnique(state, cond);
+    //Gladtbx: if condition is constant, then we can go directly to the switched block
     if (ConstantExpr *CE = dyn_cast<ConstantExpr>(cond)) {
       // Somewhat gross to create these all the time, but fine till we
       // switch to an internal rep.
@@ -1555,7 +1567,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       unsigned index = si->findCaseValue(ci);
 #endif
       transferToBasicBlock(si->getSuccessor(index), si->getParent(), state);
-    } else {
+    }
+    //else we need to generate cases for which block to go to.
+    else {
       std::map<BasicBlock*, ref<Expr> > targets;
       ref<Expr> isDefault = ConstantExpr::alloc(1, Expr::Bool);
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 1)      
@@ -1566,12 +1580,15 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       for (unsigned i=1, cases = si->getNumCases(); i<cases; ++i) {
         ref<Expr> value = evalConstant(si->getCaseValue(i));
 #endif
+        //Gladtbx: match = condition evaluated to value
         ref<Expr> match = EqExpr::create(cond, value);
+        //Gladtbx: isDefault = match = zero. default can be reached when nothing can be matched.
         isDefault = AndExpr::create(isDefault, Expr::createIsZero(match));
         bool result;
         bool success = solver->mayBeTrue(state, match, result);
         assert(success && "FIXME: Unhandled solver failure");
         (void) success;
+        //Gladtbx: when match can be solved.
         if (result) {
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 1)
           BasicBlock *caseSuccessor = i.getCaseSuccessor();
@@ -1582,10 +1599,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
             targets.insert(std::make_pair(caseSuccessor,
                            ConstantExpr::alloc(0, Expr::Bool))).first;
 
-          it->second = OrExpr::create(match, it->second);
+          it->second = OrExpr::create(match, it->second);//Gladtbx: seems redoundent, don't know why
         }
       }
       bool res;
+      //Gladtbx: see if default can be reached.
       bool success = solver->mayBeTrue(state, isDefault, res);
       assert(success && "FIXME: Unhandled solver failure");
       (void) success;
@@ -1637,6 +1655,19 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       terminateStateOnExecError(state, "inline assembly is unsupported");
       break;
     }
+    //Gladtbx: determine if the target function is of our interest
+    if(ifTargetFunction(f)){
+    	state.targetFunc = true;
+    	if(interpreterHandler->ifConstructSeedForTarget()){
+    		//Gladtbx:Reached target function, we halt here to generate seed.
+    		terminateStateEarly(state,"Target Function Reached, Stop Executing to Generate KTEST Seeds.");
+    		break;
+    	}
+    }
+    //Gladtbx: not setting it to false so any time, this bool represents that if we
+    //have hit the target func or not. No matter if we are still inside a target func.
+    //    else state.targetFunc = false;
+
     // evaluate arguments
     std::vector< ref<Expr> > arguments;
     arguments.reserve(numArgs);
@@ -1686,7 +1717,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           i++;
         }
       }
-
+//Gladtbx: Execute call, may be special functions.
       executeCall(state, ki, f, arguments);
     } else {
       ref<Expr> v = eval(ki, 0, state).value;
@@ -2821,6 +2852,7 @@ void Executor::callExternalFunction(ExecutionState &state,
                                     Function *function,
                                     std::vector< ref<Expr> > &arguments) {
   // check if specialFunctionHandler wants it
+	//check if it is made by student function or not. Direct to different handler.
   if (specialFunctionHandler->handle(state, function, target, arguments))
     return;
   
