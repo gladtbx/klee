@@ -111,6 +111,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("\01__isoc99_fscanf",handleFscanf,true),
   add("fscanf",handleFscanf,true),
   add("__isoc99_fscanf",handleFscanf,true),
+  add("fprintf",handleFprintf,true),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
@@ -690,7 +691,6 @@ void SpecialFunctionHandler::handleGetValue(ExecutionState &state,
                                             std::vector<ref<Expr> > &arguments) {
   assert(arguments.size()==1 &&
          "invalid number of arguments to klee_get_value");
-
   executor.executeGetValue(state, arguments[0], target);
 }
 
@@ -993,7 +993,7 @@ ref<Expr> SpecialFunctionHandler::HexCondGen(ref<Expr> bufferchar){
 
 void SpecialFunctionHandler::processScan(ExecutionState *current_state,Expr::Width w,ref<Expr> bufferchar,
 			ref<Expr> targetBuf,const int fileid, const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed,
-			KInstruction *target, int bytesread, int ary, ref<Expr> (*condFunc) (ref<Expr>)){
+			KInstruction *target, int ary, ref<Expr> (*condFunc) (ref<Expr>)){
 	/*
 	 * Condition should be:
 	 * if buffer lasts (size)
@@ -1017,16 +1017,19 @@ void SpecialFunctionHandler::processScan(ExecutionState *current_state,Expr::Wid
 					TargetData *TD = new TargetData(executor.kmodule->module);
 					unsigned width = TD->getTypeAllocSizeInBits(resultType);
 					ref<Expr> e;
-					if(bytesread == 0)
+					if(branches.second->getBytesRead() == 0)
 						e = ConstantExpr::alloc(EOF,width);
 					else
-						e = ConstantExpr::alloc(bytesread,width);
+						e = ConstantExpr::alloc(branches.second->getBytesRead(),width);
 					executor.bindLocal(target, *branches.second, e);
 				 }
 			}
 			else{
 				for(std::vector<std::pair<ExecutionState*, ref<Expr> > >::iterator rs= result.begin(); rs != result.end();rs++){
 					executor.executeMemoryOperation(*(rs->first),true,targetBuf,rs->second,0);//bind result with target
+					rs->first->incBytesRead();
+					ExecutionState::fileDesc* local_desc = rs->first->getBuffer(fileid);
+					local_desc->decOffset();//We have read one more, now we need to back up;
 					stateProcessed->push_back(rs->first);//put into statequeue.
 				}
 			}
@@ -1041,10 +1044,10 @@ void SpecialFunctionHandler::processScan(ExecutionState *current_state,Expr::Wid
 					TargetData *TD = new TargetData(executor.kmodule->module);
 					unsigned width = TD->getTypeAllocSizeInBits(resultType);
 					ref<Expr> e;
-					if(bytesread == 0)
+					if(branches.first->getBytesRead() == 0)
 						e = ConstantExpr::alloc(EOF,width);
 					else
-						e = ConstantExpr::alloc(bytesread,width);
+						e = ConstantExpr::alloc(branches.first->getBytesRead(),width);
 					executor.bindLocal(target, *branches.first, e);
 				 }
 				return;//no more to read
@@ -1057,19 +1060,19 @@ void SpecialFunctionHandler::processScan(ExecutionState *current_state,Expr::Wid
 }
 
 void SpecialFunctionHandler::processScanInt(ExecutionState *current_state,Expr::Width w,ref<Expr> bufferchar,
-			ref<Expr> targetBuf,const int fileid, const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed, KInstruction *target, int bytesread){
-		processScan(current_state, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, bytesread, 10, &IntCondGen);
+			ref<Expr> targetBuf,const int fileid, const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed, KInstruction *target){
+		processScan(current_state, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, 10, &IntCondGen);
 }
 
 void SpecialFunctionHandler::processScanOct(ExecutionState *current_state,Expr::Width w,ref<Expr> bufferchar,
-			ref<Expr> targetBuf,const int fileid, const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed, KInstruction *target, int bytesread){
-		processScan(current_state, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, bytesread, 8, &OctCondGen);
+			ref<Expr> targetBuf,const int fileid, const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed, KInstruction *target){
+		processScan(current_state, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, 8, &OctCondGen);
 }
 
 void SpecialFunctionHandler::processScanHex(ExecutionState *current_state,Expr::Width w,
 		ref<Expr> bufferchar, ref<Expr> targetBuf, const int fileid,
 		const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed,
-		KInstruction *target, int bytesread){
+		KInstruction *target){
 	/*
 	 * If it is 0x, takes care of it
 	 */
@@ -1080,16 +1083,16 @@ void SpecialFunctionHandler::processScanHex(ExecutionState *current_state,Expr::
 		if(local_desc->getoffset() >= local_desc->getsize()){
 			zeroBranch.first->ioBuffer.addDigit(bufferchar);
 			//In this case, the previos read zero is the hex value, so we should bind it to the target.
-			bytesread++;
 			ref<Expr> result = zeroBranch.first->ioBuffer.processNumber(w, 16);//We don't need to check for Null because we just pushed.
 			executor.executeMemoryOperation(*(zeroBranch.first),true,targetBuf,result,0);//bind result with target
+			zeroBranch.first->incBytesRead();
 			//return EOF as there is no more to read
 			LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 			if (!resultType->isVoidTy()) {
 				TargetData *TD = new TargetData(executor.kmodule->module);
 				unsigned width = TD->getTypeAllocSizeInBits(resultType);
 				ref<Expr> e;
-				e = ConstantExpr::alloc(bytesread,width);
+				e = ConstantExpr::alloc(zeroBranch.first->getBytesRead(),width);
 				executor.bindLocal(target, *zeroBranch.first, e);
 			 }
 			//no more to read
@@ -1113,10 +1116,10 @@ void SpecialFunctionHandler::processScanHex(ExecutionState *current_state,Expr::
 						TargetData *TD = new TargetData(executor.kmodule->module);
 						unsigned width = TD->getTypeAllocSizeInBits(resultType);
 						ref<Expr> e;
-						if(bytesread == 0)
+						if(xBranch.first->getBytesRead() == 0)
 							e = ConstantExpr::alloc(EOF,width);
 						else
-							e = ConstantExpr::alloc(bytesread,width);
+							e = ConstantExpr::alloc(xBranch.first->getBytesRead(),width);
 						executor.bindLocal(target, *xBranch.first, e);
 					 }
 				}
@@ -1128,7 +1131,7 @@ void SpecialFunctionHandler::processScanHex(ExecutionState *current_state,Expr::
 					 * If digit is between 0-9 or a-f or A-F
 					 */
 
-					processScan(xBranch.first, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, bytesread, 16, &HexCondGen);
+					processScan(xBranch.first, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, 16, &HexCondGen);
 				}
 			}
 			if(xBranch.second){
@@ -1137,7 +1140,7 @@ void SpecialFunctionHandler::processScanHex(ExecutionState *current_state,Expr::
 				/*
 				 * If digit is between 0-9 or a-f or A-F
 				 */
-				processScan(xBranch.second, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, bytesread, 16, &HexCondGen);
+				processScan(xBranch.second, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, 16, &HexCondGen);
 			}
 		}
 	}
@@ -1146,7 +1149,7 @@ void SpecialFunctionHandler::processScanHex(ExecutionState *current_state,Expr::
 		/*
 		 * If digit is between 0-9 or a-f or A-F
 		 */
-		processScan(zeroBranch.second, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, bytesread, 16, &HexCondGen);
+		processScan(zeroBranch.second, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, 16, &HexCondGen);
 	}
 }
 
@@ -1184,9 +1187,9 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 				 erie = rl.end(); erit != erie; ++erit) {
 			ObjectPair op = erit->first;
 			ExecutionState *sinit = erit->second;
+			sinit->clearBytesRead();//Clear bytes read counter
 			sinit->ioBuffer.clear();//For each new scan, clear the ioBuffer.
 			bool result;
-			int bytesread = 0;
 			std::vector<ExecutionState*> stateNotProcessed;
 			std::vector<ExecutionState*> stateProcessed;
 			stateNotProcessed.push_back(sinit);
@@ -1204,10 +1207,10 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 							TargetData *TD = new TargetData(executor.kmodule->module);
 							unsigned width = TD->getTypeAllocSizeInBits(resultType);
 							ref<Expr> e;
-							if(bytesread == 0)
+							if((*s)->getBytesRead() == 0)
 								e = ConstantExpr::alloc(EOF,width);
 							else
-								e = ConstantExpr::alloc(bytesread,width);
+								e = ConstantExpr::alloc((*s)->getBytesRead(),width);
 							executor.bindLocal(target, **s, e);
 						 }
 						continue;
@@ -1216,7 +1219,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 					ref<Expr> bufferchar = op.second->read8(descriptor->getoffset());
 					descriptor->incOffset();
 					if(*it == '%'){//Read to dest
-						int argNum = bytesread+2;
+						int argNum = (*s)->getBytesRead()+2;
 						if(argNum >= arguments.size()){
 							//Not enough parameters to be read to.
 							klee_warning("Not enough parameter to be put char in");
@@ -1226,10 +1229,10 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 								TargetData *TD = new TargetData(executor.kmodule->module);
 								unsigned width = TD->getTypeAllocSizeInBits(resultType);
 								ref<Expr> e;
-								if(bytesread == 0)
+								if((*s)->getBytesRead() == 0)
 									e = ConstantExpr::alloc(EOF,width);
 								else
-									e = ConstantExpr::alloc(bytesread,width);
+									e = ConstantExpr::alloc((*s)->getBytesRead(),width);
 								executor.bindLocal(target, **s, e);
 							 }
 							continue;
@@ -1242,25 +1245,32 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 						//it now is the first char of specifier
 						char specifier[3]={'\0','\0','\0'};
 						int index = 0;
-						it++;
-
-						specifier[index] = *it;
+						std::string::iterator nextit = it+1;//if it points out of bound?
+						if(nextit == format.end()){
+							//warning.Gladtbx:Maybe should be error?!
+							klee_warning("Nothing behind % sign!");
+							continue;
+						}
+						specifier[index] = *nextit;
 						//first check if it is length. include'l','ll','L','h','hh','j','z','t'
-						if(*it == 'l' || *it == 'h' || *it == 'j' || *it == 'z' || *it == 't' || *it == 'L'){
-							it++;//add checking for it not out of bound
-							if(it == format.end()){
+						if(*nextit == 'l' || *nextit == 'h' || *nextit == 'j' || *nextit == 'z' || *nextit == 't' || *nextit == 'L'){
+							nextit++;//add checking for it not out of bound
+							if(nextit == format.end()){
 								klee_warning("Fscanf missing indicator before reaching end of string");
+								continue;
 								//return
 							}
 							index++;
-							specifier[index] = *it;
+							specifier[index] = *nextit;
 							if(specifier[0] == specifier[1]){
 								//we have 'hh' or 'll' and still need one more char
-								it++;
+								nextit++;
 								index++;
-								specifier[index] = *it;
+								specifier[index] = *nextit;
 							}
 						}
+						//clear neg flag and previous read data
+						(*s)->ioBuffer.clear();
 						//if no length is found we have the specifier we need
 						//check %f
 						/*
@@ -1280,28 +1290,28 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 										TargetData *TD = new TargetData(executor.kmodule->module);
 										unsigned width = TD->getTypeAllocSizeInBits(resultType);
 										ref<Expr> e;
-										if(bytesread == 0)
+										if((signbranches.first)->getBytesRead() == 0)
 											e = ConstantExpr::alloc(EOF,width);
 										else
-											e = ConstantExpr::alloc(bytesread,width);
+											e = ConstantExpr::alloc((signbranches.first)->getBytesRead(),width);
 										executor.bindLocal(target, *signbranches.first, e);
 									 }
 								}
 								bufferchar = op.second->read8(local_desc->getoffset());//read next char
 								local_desc->incOffset();
 								if(specifier[0] == 'd')
-									processScanInt(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target,bytesread);
+									processScanInt(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target);
 								else
-									processScanOct(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target,bytesread);
+									processScanOct(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target);
 							}
 
 							if(signbranches.second){//if positive
 								if(specifier[0] == 'd')
-									processScanInt(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target,bytesread);
+									processScanInt(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target);
 								else
-									processScanOct(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target,bytesread);
+									processScanOct(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target);
 							}
-							bytesread++;
+							//bytesread++;
 						}
 						else if(specifier[0] == 'i'){
 
@@ -1320,26 +1330,37 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 										TargetData *TD = new TargetData(executor.kmodule->module);
 										unsigned width = TD->getTypeAllocSizeInBits(resultType);
 										ref<Expr> e;
-										if(bytesread == 0)
+										if(signbranches.first->getBytesRead() == 0)
 											e = ConstantExpr::alloc(EOF,width);
 										else
-											e = ConstantExpr::alloc(bytesread,width);
+											e = ConstantExpr::alloc(signbranches.first->getBytesRead(),width);
 										executor.bindLocal(target, *signbranches.first, e);
 									 }
 								}
 								bufferchar = op.second->read8(local_desc->getoffset());//read next char
 								local_desc->incOffset();
-								processScanHex(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target,bytesread);
+								processScanHex(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target);
 							}
 
 							if(signbranches.second){//if positive
-								processScanHex(signbranches.second,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target,bytesread);
+								processScanHex(signbranches.second,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target);
 							}
-							bytesread++;
 						}
 						else if(specifier[0] == 'u'){
 
 						}
+						//if not a correct specifier, return numbytes read;
+						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						if (!resultType->isVoidTy()) {
+							TargetData *TD = new TargetData(executor.kmodule->module);
+							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							ref<Expr> e;
+							if((*s)->getBytesRead() == 0)
+								e = ConstantExpr::alloc(EOF,width);
+							else
+								e = ConstantExpr::alloc((*s)->getBytesRead(),width);
+							executor.bindLocal(target, **s, e);
+						 }
 					}
 
 					else if(*it =='\t'||*it == '\n' ||*it == '\v' || *it== '\f' || *it == '\r' ){//add tab space etc..
@@ -1361,12 +1382,24 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 								TargetData *TD = new TargetData(executor.kmodule->module);
 								unsigned width = TD->getTypeAllocSizeInBits(resultType);
 								ref<Expr> e;
-								if(bytesread == 0)
+								if((*s)->getBytesRead() == 0)
 									e = ConstantExpr::alloc(EOF,width);
 								else
-									e = ConstantExpr::alloc(bytesread,width);
+									e = ConstantExpr::alloc((*s)->getBytesRead(),width);
 								executor.bindLocal(target, **s, e);
 							 }
+						}
+					}
+				}
+				if(*it == '%'){//if it is percent, we need it++
+					it++;
+					if(it == format.end()){
+						break;
+					}
+					if((*it == 'l' || *it == 'h' || *it == 'j' || *it == 'z' || *it == 't' || *it == 'L')){
+						it++;//FIXME:Only consider 1 bit width indicator.
+						if(it== format.end()){
+							break;
 						}
 					}
 				}
@@ -1381,12 +1414,117 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 					TargetData *TD = new TargetData(executor.kmodule->module);
 					unsigned width = TD->getTypeAllocSizeInBits(resultType);
 					ref<Expr> e;
-					if(bytesread == 0)
+					if((*s)->getBytesRead() == 0)
 						e = ConstantExpr::alloc(EOF,width);
 					else
-						e = ConstantExpr::alloc(bytesread,width);
+						e = ConstantExpr::alloc((*s)->getBytesRead(),width);
 					executor.bindLocal(target, **s, e);
 				 }
 			}
 		}
+}
+
+void SpecialFunctionHandler::handleFprintf(ExecutionState &state,
+        KInstruction *target,
+        std::vector<ref<Expr> > &arguments){
+	assert(arguments.size()>1 && "Wrong number of arguments for fprintf");
+	std::string format = readStringAtAddress(state,arguments[1]);
+	ref<ConstantExpr> value;
+	executor.solver->getValue(state,arguments[0],value);
+	int fileid = value.get()->getZExtValue();
+	klee_warning("Fileid: %d", fileid);
+	klee_warning("Format String: %s", format.c_str());
+	/*
+	 * Start reading from the buffer
+	 */
+	ExecutionState::fileDesc* descriptor = state.getBuffer(fileid);
+	ObjectPair op = descriptor->getBuffer();
+	const ObjectState* os = op.second;
+	const MemoryObject* mo = op.first;
+	int size = descriptor->getsize();
+	std::string::iterator it;
+	ref<ConstantExpr> bufferLocation = mo->getBaseExpr();
+	/*
+	 * First we resolve the content of the symbolic input.
+	 * This may fork new states as different versions of input may be reached here.
+	 * We do not need to resolve the buffers that are read to as it is going to be written any way
+	 */
+	Executor::ExactResolutionList rl;
+	executor.resolveExact(state, bufferLocation, rl, "fprintf");
+	for (Executor::ExactResolutionList::iterator erit = rl.begin(),
+			 erie = rl.end(); erit != erie; ++erit) {
+		ObjectPair op = erit->first;
+		ObjectState* os = const_cast<klee::ObjectState*> (op.second);
+		ExecutionState *sinit = erit->second;
+		int byteswrite = 0;
+		for(it = format.begin();it!=format.end();it++){
+			if(*it != '%'){//not a variable
+				if(descriptor->getoffset()>=size){//too much to put into the target buffer
+					klee_error("Targetbuffer overflow, check Fprintf or allocate larger buffer");
+				}
+				os->write8((unsigned) descriptor->getoffset(),*it);
+				descriptor->incOffset();
+				if(descriptor->getoffset()>=descriptor->getsize()){
+					klee_error("Output buffer over flow!!");
+				}
+			}
+			else{
+				it++;
+				if(it == format.end()){
+					klee_warning("Missing indicator after % sign in fprintf!");
+					os->write8((unsigned) descriptor->getoffset(),'%');
+					descriptor->incOffset();
+					if(descriptor->getoffset()>=descriptor->getsize()){
+						klee_error("Output buffer over flow!!");
+					}
+					continue;
+				}
+				if(*it == 'd' || *it == 'x' || *it == 'X' || *it == 'o'){//if 32 bit width
+					//check if argument is the correct width
+					ref<Expr> inchar;
+					inchar = SExtExpr::create(arguments[byteswrite+2],32);
+					os->write((unsigned) descriptor->getoffset(),arguments[byteswrite+2]);
+					byteswrite++;
+					descriptor->incOffset();
+					descriptor->incOffset();
+					descriptor->incOffset();
+					descriptor->incOffset();
+					if(descriptor->getoffset()>=descriptor->getsize()){
+						klee_error("Output buffer over flow!!");
+					}
+				}
+				else if(*it == 'c'){//if 8 bit width
+					//check if argument is the correct width
+					ref<Expr> inchar;
+					inchar = SExtExpr::create(arguments[byteswrite+2],8);
+					os->write((unsigned) descriptor->getoffset(),arguments[byteswrite+2]);
+					byteswrite++;
+					descriptor->incOffset();
+					if(descriptor->getoffset()>=descriptor->getsize()){
+						klee_error("Output buffer over flow!!");
+					}
+				}
+				else{
+					os->write8((unsigned) descriptor->getoffset(),'%');
+					descriptor->incOffset();
+					if(descriptor->getoffset()>=descriptor->getsize()){
+						klee_error("Output buffer over flow!!");
+					}
+					os->write8((unsigned) descriptor->getoffset(),*it);
+					descriptor->incOffset();
+					if(descriptor->getoffset()>=descriptor->getsize()){
+						klee_error("Output buffer over flow!!");
+					}
+				}
+			}
+		}
+		LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+		if (!resultType->isVoidTy()) {
+			TargetData *TD = new TargetData(executor.kmodule->module);
+			unsigned width = TD->getTypeAllocSizeInBits(resultType);
+			ref<Expr> e;
+			e = ConstantExpr::alloc(byteswrite,width);
+			executor.bindLocal(target, *sinit, e);
+		 }
+	}
 }

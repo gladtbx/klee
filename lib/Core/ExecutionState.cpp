@@ -97,6 +97,7 @@ ExecutionState::~ExecutionState() {
 
 ExecutionState::ExecutionState(const ExecutionState& state):
     fnAliases(state.fnAliases),
+    FscanfBytesRead(state.FscanfBytesRead),
     pc(state.pc),
     prevPC(state.prevPC),
     stack(state.stack),

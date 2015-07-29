@@ -114,11 +114,12 @@ bool StagedSolverImpl::computeValidity(const Query& query,
 }
 
 bool StagedSolverImpl::computeValue(const Query& query,
-                                    ref<Expr> &result) {
-  if (primary->computeValue(query, result))
+                                    ref<Expr> &result,
+                                    const Query& full_query) {
+  if (primary->computeValue(query, result, full_query))
     return true;
 
-  return secondary->impl->computeValue(query, result);
+  return secondary->impl->computeValue(query, result, full_query);
 }
 
 bool 

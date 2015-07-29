@@ -81,7 +81,7 @@ namespace klee {
     /// The query expression is guaranteed to be non-constant.
     ///
     /// \return True on success
-    virtual bool computeValue(const Query& query, ref<Expr> &result) = 0;
+    virtual bool computeValue(const Query& query, ref<Expr> &result, const Query& full_query) = 0;
     
     /// \sa Solver::getInitialValues()
     virtual bool computeInitialValues(const Query& query,

@@ -73,6 +73,8 @@ private:
 
   std::map<std::string, std::string> fnAliases;
 
+  int FscanfBytesRead = 0;
+
 public:
   // Execution - Control Flow specific
 
@@ -202,6 +204,9 @@ public:
 	  void incOffset(){
 		  offset++;
 	  }
+	  void decOffset(){
+		  offset--;
+	  }
   };
 
   class IObuffer{
@@ -256,6 +261,18 @@ public:
   };
 
   IObuffer ioBuffer;
+
+  int getBytesRead(){
+	  return FscanfBytesRead;
+  }
+
+  void incBytesRead(){
+	  FscanfBytesRead++;
+  }
+
+  void clearBytesRead(){
+	  FscanfBytesRead = 0;
+  }
 private:
   ExecutionState() : ptreeNode(0) {}
 

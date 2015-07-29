@@ -11,6 +11,7 @@
 #define KLEE_CONSTRAINTS_H
 
 #include "klee/Expr.h"
+#include "stdio.h"
 
 // FIXME: Currently we use ConstraintManager for two things: to pass
 // sets of constraints around, and to optimize constraints. We should
@@ -65,6 +66,14 @@ public:
     return constraints == other.constraints;
   }
   
+  void dumpConstraints() const{
+	  printf("Constraints are:\n");
+	  for(std::vector< ref<Expr> >::const_iterator it=constraints.begin();it!=constraints.end();it++){
+		  it->get()->dump();
+	  }
+	  printf("Constraints done.\n");
+  }
+
 private:
   std::vector< ref<Expr> > constraints;
 
