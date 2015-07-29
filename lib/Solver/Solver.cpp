@@ -183,7 +183,7 @@ bool Solver::getValue(const Query& query, ref<ConstantExpr> &result) {
 
   // FIXME: Push ConstantExpr requirement down.
   ref<Expr> tmp;
-  if (!impl->computeValue(query, tmp))
+  if (!impl->computeValue(query, tmp, query))
     return false;
   
   result = cast<ConstantExpr>(tmp);
@@ -330,7 +330,7 @@ public:
   
   bool computeValidity(const Query&, Solver::Validity &result);
   bool computeTruth(const Query&, bool &isValid);
-  bool computeValue(const Query&, ref<Expr> &result);
+  bool computeValue(const Query&, ref<Expr> &result, const Query& full_query);
   bool computeInitialValues(const Query&,
                             const std::vector<const Array*> &objects,
                             std::vector< std::vector<unsigned char> > &values,
@@ -371,16 +371,17 @@ bool ValidatingSolver::computeValidity(const Query& query,
 }
 
 bool ValidatingSolver::computeValue(const Query& query,
-                                    ref<Expr> &result) {  
+                                    ref<Expr> &result,
+                                    const Query& full_query) {
   bool answer;
 
-  if (!solver->impl->computeValue(query, result))
+  if (!solver->impl->computeValue(query, result,full_query))
     return false;
   // We don't want to compare, but just make sure this is a legal
   // solution.
-  if (!oracle->impl->computeTruth(query.withExpr(NeExpr::create(query.expr, 
+  if (!oracle->impl->computeTruth(full_query.withExpr(NeExpr::create(query.expr,
                                                                 result)),
-                                  answer))
+                                  answer))//Gladtbx: Maybe using query? For safety now use full_query.
     return false;
 
   if (answer)
@@ -468,7 +469,7 @@ public:
     // FIXME: We should have stats::queriesFail;
     return false; 
   }
-  bool computeValue(const Query&, ref<Expr> &result) { 
+  bool computeValue(const Query&, ref<Expr> &result, const Query& full_query) {
     ++stats::queries;
     ++stats::queryCounterexamples;
     return false; 
@@ -509,7 +510,7 @@ public:
   void setCoreSolverTimeout(double _timeout) { timeout = _timeout; }
 
   bool computeTruth(const Query&, bool &isValid);
-  bool computeValue(const Query&, ref<Expr> &result);
+  bool computeValue(const Query&, ref<Expr> &result, const Query& full_query);
   bool computeInitialValues(const Query&,
                             const std::vector<const Array*> &objects,
                             std::vector< std::vector<unsigned char> > &values,
@@ -626,7 +627,8 @@ bool STPSolverImpl::computeTruth(const Query& query,
 }
 
 bool STPSolverImpl::computeValue(const Query& query,
-                                 ref<Expr> &result) {
+                                 ref<Expr> &result,
+                                 const Query& full_query) {
   std::vector<const Array*> objects;
   std::vector< std::vector<unsigned char> > values;
   bool hasSolution;
@@ -634,7 +636,7 @@ bool STPSolverImpl::computeValue(const Query& query,
   // Find the object used in the expression, and compute an assignment
   // for them.
   findSymbolicObjects(query.expr, objects);
-  if (!computeInitialValues(query.withFalse(), objects, values, hasSolution))
+  if (!computeInitialValues(full_query.withFalse(), objects, values, hasSolution))//Gladtbx: Maybe query? Use full_query for safety issue.
     return false;
   assert(hasSolution && "state has invalid constraint set");
   

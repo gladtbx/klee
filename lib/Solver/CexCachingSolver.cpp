@@ -21,6 +21,7 @@
 #include "SolverStats.h"
 
 #include "llvm/Support/CommandLine.h"
+#include <stdio.h>
 
 using namespace klee;
 using namespace llvm;
@@ -82,7 +83,7 @@ public:
   
   bool computeTruth(const Query&, bool &isValid);
   bool computeValidity(const Query&, Solver::Validity &result);
-  bool computeValue(const Query&, ref<Expr> &result);
+  bool computeValue(const Query&, ref<Expr> &result, const Query& full_query);
   bool computeInitialValues(const Query&,
                             const std::vector<const Array*> &objects,
                             std::vector< std::vector<unsigned char> > &values,
@@ -120,6 +121,11 @@ struct NullOrSatisfyingAssignment {
 /// unsatisfiable query).
 /// \return - True if a cached result was found.
 bool CexCachingSolver::searchForAssignment(KeyType &key, Assignment *&result) {
+  printf("Keys are:\n");
+  for (KeyType::iterator it = key.begin(); it != key.end(); it++){
+	  it->get()->dump();
+  }
+  printf("Keys done\n");
   Assignment * const *lookup = cache.lookup(key);
   if (lookup) {
     result = *lookup;
@@ -311,14 +317,18 @@ bool CexCachingSolver::computeTruth(const Query& query,
 }
 
 bool CexCachingSolver::computeValue(const Query& query,
-                                    ref<Expr> &result) {
+                                    ref<Expr> &result,
+                                    const Query& full_query) {
   TimerStatIncrementer t(stats::cexCacheTime);
 
   Assignment *a;
-  if (!getAssignment(query.withFalse(), a))
+  if (!getAssignment(full_query.withFalse(), a))
     return false;
   assert(a && "computeValue() must have assignment");
-  result = a->evaluate(query.expr);  
+  result = a->evaluate(query.expr);
+  printf("Computed Value:\n");
+  result->dump();
+  printf("Computed Value done\n");
   assert(isa<ConstantExpr>(result) && 
          "assignment evaluation did not result in constant");
   return true;

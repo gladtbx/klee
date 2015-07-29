@@ -232,7 +232,7 @@ IndependentElementSet getIndependentConstraints(const Query& query,
   for (ConstraintManager::const_iterator it = query.constraints.begin(), 
          ie = query.constraints.end(); it != ie; ++it)
     worklist.push_back(std::make_pair(*it, IndependentElementSet(*it)));
-
+  query.constraints.dumpConstraints();
   // XXX This should be more efficient (in terms of low level copy stuff).
   bool done = false;
   do {
@@ -250,6 +250,9 @@ IndependentElementSet getIndependentConstraints(const Query& query,
     }
     worklist.swap(newWorklist);
   } while (!done);
+  for(std::vector< ref<Expr> >::iterator rit = result.begin();rit!=result.end();rit++){
+	  rit->get()->dump();
+  }
 
   KLEE_DEBUG(
     std::set< ref<Expr> > reqset(result.begin(), result.end());
@@ -281,7 +284,7 @@ public:
 
   bool computeTruth(const Query&, bool &isValid);
   bool computeValidity(const Query&, Solver::Validity &result);
-  bool computeValue(const Query&, ref<Expr> &result);
+  bool computeValue(const Query&, ref<Expr> &result, const Query& full_query);
   bool computeInitialValues(const Query& query,
                             const std::vector<const Array*> &objects,
                             std::vector< std::vector<unsigned char> > &values,
@@ -313,12 +316,12 @@ bool IndependentSolver::computeTruth(const Query& query, bool &isValid) {
                                     isValid);
 }
 
-bool IndependentSolver::computeValue(const Query& query, ref<Expr> &result) {
+bool IndependentSolver::computeValue(const Query& query, ref<Expr> &result, const Query& full_query) {
   std::vector< ref<Expr> > required;
   IndependentElementSet eltsClosure = 
     getIndependentConstraints(query, required);
   ConstraintManager tmp(required);
-  return solver->impl->computeValue(Query(tmp, query.expr), result);
+  return solver->impl->computeValue(Query(tmp, query.expr), result, query);
 }
 
 SolverImpl::SolverRunStatus IndependentSolver::getOperationStatusCode() {

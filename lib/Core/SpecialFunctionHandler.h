@@ -79,19 +79,19 @@ namespace klee {
     static ref<Expr> HexCondGen(ref<Expr> bufferchar);
     void processScan(ExecutionState *current_state,Expr::Width w,ref<Expr> bufferchar,
     			ref<Expr> targetBuf,const int fileid, const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed,
-    			KInstruction *target, int bytesread, int ary,  ref<Expr> (*condFunc) (ref<Expr>));
+    			KInstruction *target, int ary,  ref<Expr> (*condFunc) (ref<Expr>));
     void processScanInt(ExecutionState *current_state,Expr::Width w,
     		ref<Expr> bufferchar, ref<Expr> targetBuf, const int fileid,
     		const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed,
-    		KInstruction *target, int bytesread);
+    		KInstruction *target);
     void processScanOct(ExecutionState *current_state,Expr::Width w,
     		ref<Expr> bufferchar, ref<Expr> targetBuf, const int fileid,
     		const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed,
-    		KInstruction *target, int bytesread);
+    		KInstruction *target);
     void processScanHex(ExecutionState *current_state,Expr::Width w,
     		ref<Expr> bufferchar, ref<Expr> targetBuf, const int fileid,
     		const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed,
-    		KInstruction *target, int bytesread);
+    		KInstruction *target);
 
   public:
     SpecialFunctionHandler(Executor &_executor);
@@ -162,6 +162,7 @@ namespace klee {
     HANDLER(handleOpen);
     HANDLER(handleMakeIOBuffer);
     HANDLER(handleFscanf);
+    HANDLER(handleFprintf);
 #undef HANDLER
   };
 } // End klee namespace
