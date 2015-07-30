@@ -121,11 +121,6 @@ struct NullOrSatisfyingAssignment {
 /// unsatisfiable query).
 /// \return - True if a cached result was found.
 bool CexCachingSolver::searchForAssignment(KeyType &key, Assignment *&result) {
-  printf("Keys are:\n");
-  for (KeyType::iterator it = key.begin(); it != key.end(); it++){
-	  it->get()->dump();
-  }
-  printf("Keys done\n");
   Assignment * const *lookup = cache.lookup(key);
   if (lookup) {
     result = *lookup;
@@ -326,9 +321,6 @@ bool CexCachingSolver::computeValue(const Query& query,
     return false;
   assert(a && "computeValue() must have assignment");
   result = a->evaluate(query.expr);
-  printf("Computed Value:\n");
-  result->dump();
-  printf("Computed Value done\n");
   assert(isa<ConstantExpr>(result) && 
          "assignment evaluation did not result in constant");
   return true;
