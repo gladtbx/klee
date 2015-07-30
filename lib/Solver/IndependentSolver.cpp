@@ -329,7 +329,6 @@ IndependentElementSet getIndependentConstraints(const Query& query,
   for (ConstraintManager::const_iterator it = query.constraints.begin(), 
          ie = query.constraints.end(); it != ie; ++it)
     worklist.push_back(std::make_pair(*it, IndependentElementSet(*it)));
-  query.constraints.dumpConstraints();
   // XXX This should be more efficient (in terms of low level copy stuff).
   bool done = false;
   do {
@@ -349,9 +348,6 @@ IndependentElementSet getIndependentConstraints(const Query& query,
     }
     worklist.swap(newWorklist);
   } while (!done);
-  for(std::vector< ref<Expr> >::iterator rit = result.begin();rit!=result.end();rit++){
-	  rit->get()->dump();
-  }
 
   KLEE_DEBUG(
     std::set< ref<Expr> > reqset(result.begin(), result.end());

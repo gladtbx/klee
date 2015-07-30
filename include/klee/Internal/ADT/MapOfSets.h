@@ -189,7 +189,6 @@ namespace klee {
     Node *n = &root;
     for (typename std::set<K>::const_iterator it = set.begin(), ie = set.end();
          it != ie; ++it){
-    	it->get()->dump();
     	n = &n->children.insert(std::make_pair(*it, Node())).first->second;
     }
     n->isEndOfSet = true;
@@ -201,7 +200,6 @@ namespace klee {
     Node *n = &root;
     for (typename std::set<K>::const_iterator it = set.begin(), ie = set.end();
          it != ie; ++it) {
-    	it->get()->dump();
       typename Node::children_ty::iterator kit = n->children.find(*it);
       if (kit==n->children.end()) {
         return 0;
