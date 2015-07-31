@@ -1449,82 +1449,86 @@ void SpecialFunctionHandler::handleFprintf(ExecutionState &state,
 	 * This may fork new states as different versions of input may be reached here.
 	 * We do not need to resolve the buffers that are read to as it is going to be written any way
 	 */
-	Executor::ExactResolutionList rl;
-	executor.resolveExact(state, bufferLocation, rl, "fprintf");
-	for (Executor::ExactResolutionList::iterator erit = rl.begin(),
-			 erie = rl.end(); erit != erie; ++erit) {
-		ObjectPair op = erit->first;
-		ObjectState* os = const_cast<klee::ObjectState*> (op.second);
-		ExecutionState *sinit = erit->second;
-		int byteswrite = 0;
-		for(it = format.begin();it!=format.end();it++){
-			if(*it != '%'){//not a variable
-				if(descriptor->getoffset()>=size){//too much to put into the target buffer
-					klee_error("Targetbuffer overflow, check Fprintf or allocate larger buffer");
+	int byteswrite = 0;
+	for(it = format.begin();it!=format.end();it++){
+		if(*it != '%'){//not a variable
+			if(descriptor->getoffset()>=size){//too much to put into the target buffer
+				klee_error("Targetbuffer overflow, check Fprintf or allocate larger buffer");
+			}
+			ref<Expr> writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
+			ref<Expr> writtenChar = ConstantExpr::create(*it,ConstantExpr::Int8);
+			executor.executeMemoryOperation(state,true,writtenLoc,writtenChar,0);
+			descriptor->incOffset();
+			if(descriptor->getoffset()>=descriptor->getsize()){
+				klee_error("Output buffer over flow!!");
+			}
+		}
+		else{
+			it++;
+			if(it == format.end()){
+				klee_warning("Missing indicator after % sign in fprintf!");
+				ref<Expr> writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
+				ref<Expr> writtenChar = ConstantExpr::create('%',ConstantExpr::Int8);
+				executor.executeMemoryOperation(state,true,writtenLoc,writtenChar,0);
+				descriptor->incOffset();
+				if(descriptor->getoffset()>=descriptor->getsize()){
+					klee_error("Output buffer over flow!!");
 				}
-				os->write8((unsigned) descriptor->getoffset(),*it);
+				continue;
+			}
+			if(*it == 'd' || *it == 'x' || *it == 'X' || *it == 'o'){//if 32 bit width
+				//check if argument is the correct width
+				if(arguments[byteswrite+2]->getWidth()!=Expr::Int32){
+					klee_error("Fprintf target buffer not correct type!");//Gladtbx:TODO:maybe turning into warning? and then support trunc/extending
+				}
+				ref<Expr> writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
+				executor.executeMemoryOperation(state,true,writtenLoc,arguments[byteswrite+2],0);
+				byteswrite++;
+				descriptor->incOffset();
+				descriptor->incOffset();
+				descriptor->incOffset();
+				descriptor->incOffset();
+				if(descriptor->getoffset()>=descriptor->getsize()){
+					klee_error("Output buffer over flow!!");
+				}
+			}
+			else if(*it == 'c'){//if 8 bit width
+				//check if argument is the correct width
+				if(arguments[byteswrite+2]->getWidth()!=Expr::Int8){
+					klee_error("Fprintf target buffer not correct type!");
+				}
+				ref<Expr> writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
+				executor.executeMemoryOperation(state,true,writtenLoc,arguments[byteswrite+2],0);
+				byteswrite++;
 				descriptor->incOffset();
 				if(descriptor->getoffset()>=descriptor->getsize()){
 					klee_error("Output buffer over flow!!");
 				}
 			}
 			else{
-				it++;
-				if(it == format.end()){
-					klee_warning("Missing indicator after % sign in fprintf!");
-					os->write8((unsigned) descriptor->getoffset(),'%');
-					descriptor->incOffset();
-					if(descriptor->getoffset()>=descriptor->getsize()){
-						klee_error("Output buffer over flow!!");
-					}
-					continue;
+				ref<Expr> writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
+				ref<Expr> writtenChar = ConstantExpr::create('%',ConstantExpr::Int8);
+				executor.executeMemoryOperation(state,true,writtenLoc,writtenChar,0);
+				descriptor->incOffset();
+				if(descriptor->getoffset()>=descriptor->getsize()){
+					klee_error("Output buffer over flow!!");
 				}
-				if(*it == 'd' || *it == 'x' || *it == 'X' || *it == 'o'){//if 32 bit width
-					//check if argument is the correct width
-					ref<Expr> inchar;
-					inchar = SExtExpr::create(arguments[byteswrite+2],32);
-					os->write((unsigned) descriptor->getoffset(),arguments[byteswrite+2]);
-					byteswrite++;
-					descriptor->incOffset();
-					descriptor->incOffset();
-					descriptor->incOffset();
-					descriptor->incOffset();
-					if(descriptor->getoffset()>=descriptor->getsize()){
-						klee_error("Output buffer over flow!!");
-					}
-				}
-				else if(*it == 'c'){//if 8 bit width
-					//check if argument is the correct width
-					ref<Expr> inchar;
-					inchar = SExtExpr::create(arguments[byteswrite+2],8);
-					os->write((unsigned) descriptor->getoffset(),arguments[byteswrite+2]);
-					byteswrite++;
-					descriptor->incOffset();
-					if(descriptor->getoffset()>=descriptor->getsize()){
-						klee_error("Output buffer over flow!!");
-					}
-				}
-				else{
-					os->write8((unsigned) descriptor->getoffset(),'%');
-					descriptor->incOffset();
-					if(descriptor->getoffset()>=descriptor->getsize()){
-						klee_error("Output buffer over flow!!");
-					}
-					os->write8((unsigned) descriptor->getoffset(),*it);
-					descriptor->incOffset();
-					if(descriptor->getoffset()>=descriptor->getsize()){
-						klee_error("Output buffer over flow!!");
-					}
+				writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
+				writtenChar = ConstantExpr::create(*it,ConstantExpr::Int8);
+				executor.executeMemoryOperation(state,true,writtenLoc,writtenChar,0);
+				descriptor->incOffset();
+				if(descriptor->getoffset()>=descriptor->getsize()){
+					klee_error("Output buffer over flow!!");
 				}
 			}
 		}
-		LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
-		if (!resultType->isVoidTy()) {
-			TargetData *TD = new TargetData(executor.kmodule->module);
-			unsigned width = TD->getTypeAllocSizeInBits(resultType);
-			ref<Expr> e;
-			e = ConstantExpr::alloc(byteswrite,width);
-			executor.bindLocal(target, *sinit, e);
-		 }
 	}
+	LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+	if (!resultType->isVoidTy()) {
+		TargetData *TD = new TargetData(executor.kmodule->module);
+		unsigned width = TD->getTypeAllocSizeInBits(resultType);
+		ref<Expr> e;
+		e = ConstantExpr::alloc(byteswrite,width);
+		executor.bindLocal(target, state, e);
+	 }
 }
