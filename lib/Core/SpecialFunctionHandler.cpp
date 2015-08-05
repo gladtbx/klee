@@ -1004,6 +1004,12 @@ void SpecialFunctionHandler::processScanInt(ExecutionState *current_state,Expr::
 		processScan(current_state, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, 10, &IntCondGen);
 }
 
+void SpecialFunctionHandler::processScanChar(ExecutionState *current_state,ref<Expr> bufferchar,
+			ref<Expr> targetBuf){
+		executor.executeMemoryOperation(*current_state,true,targetBuf,bufferchar,0);//bind result with target
+		current_state->incBytesRead();
+}
+
 void SpecialFunctionHandler::processScanOct(ExecutionState *current_state,Expr::Width w,ref<Expr> bufferchar,
 			ref<Expr> targetBuf,const int fileid, const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed, KInstruction *target){
 		processScan(current_state, w, bufferchar, targetBuf, fileid, op, stateProcessed, target, 8, &OctCondGen);
@@ -1255,6 +1261,10 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 						}
 						else if(specifier[0] == 'i'){
 
+						}
+						else if(specifier[0] == 'c'){
+							processScanChar(*s,bufferchar,targetBuf);
+							//bytesread++;
 						}
 						else if(specifier[0] == 'x'){
 							//check negative sign
