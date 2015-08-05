@@ -1264,6 +1264,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 						}
 						else if(specifier[0] == 'c'){
 							processScanChar(*s,bufferchar,targetBuf);
+							stateProcessed.push_back(*s);
 							//bytesread++;
 						}
 						else if(specifier[0] == 'x'){
