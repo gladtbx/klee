@@ -84,6 +84,8 @@ namespace klee {
     		ref<Expr> bufferchar, ref<Expr> targetBuf, const int fileid,
     		const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed,
     		KInstruction *target);
+    void processScanChar(ExecutionState *current_state,ref<Expr> bufferchar,
+			ref<Expr> targetBuf);
     void processScanOct(ExecutionState *current_state,Expr::Width w,
     		ref<Expr> bufferchar, ref<Expr> targetBuf, const int fileid,
     		const ObjectPair& op, std::vector<ExecutionState*> *stateProcessed,
