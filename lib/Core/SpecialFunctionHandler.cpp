@@ -1430,11 +1430,9 @@ void SpecialFunctionHandler::handleFprintf(ExecutionState &state,
 			}
 			if(*it == 'd' || *it == 'x' || *it == 'X' || *it == 'o'){//if 32 bit width
 				//check if argument is the correct width
-				if(arguments[byteswrite+2]->getWidth()!=Expr::Int32){
-					klee_error("Fprintf target buffer not correct type!");//Gladtbx:TODO:maybe turning into warning? and then support trunc/extending
-				}
+				ref<Expr> character = ZExtExpr::create(arguments[byteswrite+2],Expr::Int32);
 				ref<Expr> writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
-				executor.executeMemoryOperation(state,true,writtenLoc,arguments[byteswrite+2],0);
+				executor.executeMemoryOperation(state,true,writtenLoc,character,0);
 				byteswrite++;
 				descriptor->incOffset();
 				descriptor->incOffset();
@@ -1446,11 +1444,9 @@ void SpecialFunctionHandler::handleFprintf(ExecutionState &state,
 			}
 			else if(*it == 'c'){//if 8 bit width
 				//check if argument is the correct width
-				if(arguments[byteswrite+2]->getWidth()!=Expr::Int8){
-					klee_error("Fprintf target buffer not correct type!");
-				}
+				ref<Expr> character = ZExtExpr::create(arguments[byteswrite+2],Expr::Int8);
 				ref<Expr> writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
-				executor.executeMemoryOperation(state,true,writtenLoc,arguments[byteswrite+2],0);
+				executor.executeMemoryOperation(state,true,writtenLoc,character,0);
 				byteswrite++;
 				descriptor->incOffset();
 				if(descriptor->getoffset()>=descriptor->getsize()){
@@ -1505,11 +1501,12 @@ void SpecialFunctionHandler::handleFputc(ExecutionState &state,
 	std::string::iterator it;
 	ref<ConstantExpr> bufferLocation = mo->getBaseExpr();
 
-	if(arguments[0]->getWidth()!=Expr::Int8){
+	if(arguments[0]->getWidth()!=Expr::Int32){
 		klee_error("Fputc target buffer not correct type!");
 	}
+	ref<Expr> character = ZExtExpr::create(arguments[0],Expr::Int8);
 	ref<Expr> writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
-	executor.executeMemoryOperation(state,true,writtenLoc,arguments[0],0);
+	executor.executeMemoryOperation(state,true,writtenLoc,character,0);
 	descriptor->incOffset();
 	if(descriptor->getoffset()>=descriptor->getsize()){
 		klee_error("Output buffer over flow!!");

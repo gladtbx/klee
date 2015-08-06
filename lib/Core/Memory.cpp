@@ -374,10 +374,8 @@ void ObjectState::setKnownSymbolic(unsigned offset,
                                    Expr *value /* can be null */) {
   if (knownSymbolics) {
     knownSymbolics[offset] = value;
-	value->dump();
   } else {
     if (value) {
-    	value->dump();
     	knownSymbolics = new ref<Expr>[size];
       knownSymbolics[offset] = value;
     }
