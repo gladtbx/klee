@@ -112,6 +112,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("fscanf",handleFscanf,true),
   add("__isoc99_fscanf",handleFscanf,true),
   add("fprintf",handleFprintf,true),
+  add("fputc",handleFputc,true),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
@@ -1541,5 +1542,42 @@ void SpecialFunctionHandler::handleFprintf(ExecutionState &state,
 		ref<Expr> e;
 		e = ConstantExpr::alloc(byteswrite,width);
 		executor.bindLocal(target, state, e);
+	 }
+}
+
+
+void SpecialFunctionHandler::handleFputc(ExecutionState &state,
+        KInstruction *target,
+        std::vector<ref<Expr> > &arguments){
+	assert(arguments.size() == 2 && "Wrong number of arguments for fprintf");
+	ref<ConstantExpr> value;
+	executor.solver->getValue(state,arguments[1],value);
+	int fileid = value.get()->getZExtValue();
+	klee_warning("Fileid: %d", fileid);
+	/*
+	 * Start reading from the buffer
+	 */
+	ExecutionState::fileDesc* descriptor = state.getBuffer(fileid);
+	ObjectPair op = descriptor->getBuffer();
+	const ObjectState* os = op.second;
+	const MemoryObject* mo = op.first;
+	int size = descriptor->getsize();
+	std::string::iterator it;
+	ref<ConstantExpr> bufferLocation = mo->getBaseExpr();
+
+	if(arguments[0]->getWidth()!=Expr::Int8){
+		klee_error("Fputc target buffer not correct type!");
+	}
+	ref<Expr> writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
+	executor.executeMemoryOperation(state,true,writtenLoc,arguments[0],0);
+	descriptor->incOffset();
+	if(descriptor->getoffset()>=descriptor->getsize()){
+		klee_error("Output buffer over flow!!");
+	}
+	LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+	if (!resultType->isVoidTy()) {
+		TargetData *TD = new TargetData(executor.kmodule->module);
+		unsigned width = TD->getTypeAllocSizeInBits(resultType);
+		executor.bindLocal(target, state, arguments[0]);
 	 }
 }
