@@ -22,6 +22,8 @@
 
 #include "klee/Internal/Support/ErrorHandling.h"
 
+#include "klee/Internal/Support/ErrorHandling.h"
+
 #include "llvm/Support/CommandLine.h"
 #include <stdio.h>
 
