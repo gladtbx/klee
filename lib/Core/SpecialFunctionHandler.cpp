@@ -164,6 +164,36 @@ void SpecialFunctionHandler::prepare() {
     		  continue;
     	  }
     }
+    if(hi.name == "fscanf"){
+  	  if(!symbolicFileIO){
+  		  handlerInfo[i] = {"",NULL,false,false,false};
+  		  continue;
+  	  }
+    }
+    if(hi.name == "\01__isoc99_fscanf"){
+	  if(!symbolicFileIO){
+		  handlerInfo[i] = {"",NULL,false,false,false};
+		  continue;
+	  }
+    }
+    if(hi.name == "__isoc99_fscanf"){
+  	  if(!symbolicFileIO){
+  		  handlerInfo[i] = {"",NULL,false,false,false};
+  		  continue;
+  	  }
+    }
+    if(hi.name == "fputc"){
+   	  if(!symbolicFileIO){
+   		  handlerInfo[i] = {"",NULL,false,false,false};
+   		  continue;
+   	  }
+     }
+    if(hi.name == "fprintf"){
+	  if(!symbolicFileIO){
+		  handlerInfo[i] = {"",NULL,false,false,false};
+		  continue;
+	  }
+    }
     Function *f = executor.kmodule->module->getFunction(hi.name);
 
     // No need to create if the function doesn't exist, since it cannot
