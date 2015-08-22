@@ -90,6 +90,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("malloc", handleMalloc, true),
   add("realloc", handleRealloc, true),
   add("fopen",handleOpen,true),
+  add("fclose",handleClose,true),
   add("klee_make_IO_buffer",handleMakeIOBuffer,false),
   add("\01__isoc99_fscanf",handleFscanf,true),
   add("fscanf",handleFscanf,true),
@@ -194,6 +195,14 @@ void SpecialFunctionHandler::prepare() {
 		  continue;
 	  }
     }
+
+    if(hi.name == "fclose"){
+	  if(!symbolicFileIO){
+		  handlerInfo[i] = {"",NULL,false,false,false};
+		  continue;
+	  }
+    }
+
     Function *f = executor.kmodule->module->getFunction(hi.name);
 
     // No need to create if the function doesn't exist, since it cannot
@@ -824,6 +833,12 @@ void SpecialFunctionHandler::handleOpen(ExecutionState &state,
 			ref<Expr> e = ConstantExpr::alloc(v,width);
 			executor.bindLocal(target, state, e);
 		 }
+}
+
+void SpecialFunctionHandler::handleClose(ExecutionState &state,
+        KInstruction *target,
+        std::vector<ref<Expr> > &arguments) {
+	return;
 }
 
 void SpecialFunctionHandler::handleMakeIOBuffer(ExecutionState &state,
