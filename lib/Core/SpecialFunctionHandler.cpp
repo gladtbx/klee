@@ -1360,7 +1360,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 						 }
 					}
 
-					else if(*it =='\t'||*it == '\n' ||*it == '\v' || *it== '\f' || *it == '\r' ){//add tab space etc..
+					else if(*it =='\t'||*it == '\n' ||*it == '\v' || *it== '\f' || *it == '\r' || *it == ' '){//add tab space etc..
 						continue;
 					}
 					else{
