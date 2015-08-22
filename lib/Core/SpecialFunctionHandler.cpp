@@ -1421,7 +1421,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 					}
 
 					else if(*it =='\t'||*it == '\n' ||*it == '\v' || *it== '\f' || *it == '\r' || *it == ' '){//add tab space etc..
-						continue;
+						stateProcessed.push_back(*s);
 					}
 					else{
 						ref<ConstantExpr> formatchar = ConstantExpr::create((uint64_t)*it,ConstantExpr::Int8);
