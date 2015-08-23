@@ -114,6 +114,8 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("__isoc99_fscanf",handleFscanf,true),
   add("fprintf",handleFprintf,true),
   add("fputc",handleFputc,true),
+  add("fread",handleFread,true),
+  add("fwrite",handleFwrite,true),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
@@ -219,6 +221,20 @@ void SpecialFunctionHandler::prepare() {
 		  handlerInfo[i] = {"",NULL,false,false,false};
 		  continue;
 	  }
+    }
+
+    if(hi.name == "fread"){
+    	if(!symbolicFileIO){
+  		  handlerInfo[i] = {"",NULL,false,false,false};
+  		  continue;
+    	}
+    }
+
+    if(hi.name == "fwrite"){
+    	if(!symbolicFileIO){
+  		  handlerInfo[i] = {"",NULL,false,false,false};
+  		  continue;
+    	}
     }
 
     Function *f = executor.kmodule->module->getFunction(hi.name);
@@ -1222,7 +1238,6 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 		 */
 		ExecutionState::fileDesc* descriptor = state.getBuffer(fileid);
 		ObjectPair op = descriptor->getBuffer();
-		const ObjectState* os = op.second;
 		const MemoryObject* mo = op.first;
 		int size = descriptor->getsize();
 		std::string::iterator it;
@@ -1496,7 +1511,6 @@ void SpecialFunctionHandler::handleFprintf(ExecutionState &state,
 	 */
 	ExecutionState::fileDesc* descriptor = state.getBuffer(fileid);
 	ObjectPair op = descriptor->getBuffer();
-	const ObjectState* os = op.second;
 	const MemoryObject* mo = op.first;
 	int size = descriptor->getsize();
 	std::string::iterator it;
@@ -1523,7 +1537,7 @@ void SpecialFunctionHandler::handleFprintf(ExecutionState &state,
 		else{
 			it++;
 			if(it == format.end()){
-				klee_warning("Missing indicator after % sign in fprintf!");
+				klee_warning("Missing indicator after \% sign in fprintf!");
 				ref<Expr> writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
 				ref<Expr> writtenChar = ConstantExpr::create('%',ConstantExpr::Int8);
 				executor.executeMemoryOperation(state,true,writtenLoc,writtenChar,0);
@@ -1600,10 +1614,8 @@ void SpecialFunctionHandler::handleFputc(ExecutionState &state,
 	 */
 	ExecutionState::fileDesc* descriptor = state.getBuffer(fileid);
 	ObjectPair op = descriptor->getBuffer();
-	const ObjectState* os = op.second;
-	const MemoryObject* mo = op.first;
-	int size = descriptor->getsize();
 	std::string::iterator it;
+	const MemoryObject* mo = op.first;
 	ref<ConstantExpr> bufferLocation = mo->getBaseExpr();
 
 	if(arguments[0]->getWidth()!=Expr::Int32){
@@ -1618,8 +1630,190 @@ void SpecialFunctionHandler::handleFputc(ExecutionState &state,
 	}
 	LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 	if (!resultType->isVoidTy()) {
-		TargetData *TD = new TargetData(executor.kmodule->module);
-		unsigned width = TD->getTypeAllocSizeInBits(resultType);
 		executor.bindLocal(target, state, arguments[0]);
 	 }
+}
+
+void SpecialFunctionHandler::handleFread(ExecutionState &state,
+        KInstruction *target,
+        std::vector<ref<Expr> > &arguments){
+		assert(arguments.size()==4 && "Wrong number of arguments for fscanf");
+		ref<ConstantExpr> value;
+		executor.solver->getValue(state,arguments[3],value);
+		int fileid = value.get()->getZExtValue();
+		executor.solver->getValue(state,arguments[2],value);
+		int count = value.get()->getZExtValue();
+		executor.solver->getValue(state,arguments[1],value);
+		int size = value.get()->getZExtValue();
+		ref<Expr> targetBuf = arguments[0];
+		ExecutionState::fileDesc* descriptor = state.getBuffer(fileid);
+		ObjectPair op = descriptor->getBuffer();
+
+		const MemoryObject* mo = op.first;
+		ref<ConstantExpr> bufferLocation = mo->getBaseExpr();
+		Executor::ExactResolutionList rl;
+		executor.resolveExact(state, bufferLocation, rl, "fscanf");
+		for (Executor::ExactResolutionList::iterator erit = rl.begin(),
+				 erie = rl.end(); erit != erie; ++erit) {
+			ObjectPair op = erit->first;
+			int desc_size = descriptor->getsize();
+			int bytesRead = 0;
+			const ObjectState* os = op.second;
+			ref<Expr> buffer;
+			for(int i = 0; i < count; i++){
+				switch (size){
+				case 1:
+					if(descriptor->getoffset() >= desc_size){//eof reached, number of bytes read returned;
+						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						if (!resultType->isVoidTy()) {
+							TargetData *TD = new TargetData(executor.kmodule->module);
+							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							ref<Expr> e;
+							e = ConstantExpr::alloc(bytesRead,width);
+							executor.bindLocal(target, state, e);
+						 }
+						return;
+					}
+					buffer = os->read8(descriptor->getoffset());
+					descriptor->incOffset();
+					bytesRead++;
+					executor.executeMemoryOperation(state,true,targetBuf,buffer,0);//bind result with target
+					targetBuf = AddExpr::create(targetBuf,ConstantExpr::create(1,targetBuf->getWidth()));//targetBuf++
+					break;
+				case 2:
+					if(descriptor->getoffset()+1>=desc_size){
+						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						if (!resultType->isVoidTy()) {
+							TargetData *TD = new TargetData(executor.kmodule->module);
+							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							ref<Expr> e;
+							e = ConstantExpr::alloc(bytesRead,width);
+							executor.bindLocal(target, state, e);
+						 }
+						return;
+					}
+					buffer = os->read(descriptor->getoffset(),Expr::Int16);
+					descriptor->incOffset();
+					descriptor->incOffset();
+					bytesRead+=2;
+					executor.executeMemoryOperation(state,true,targetBuf,buffer,0);//bind result with target
+					targetBuf = AddExpr::create(targetBuf,ConstantExpr::create(2,targetBuf->getWidth()));//targetBuf++
+					break;
+				case 4:
+					if(descriptor->getoffset()+1>=desc_size){
+						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						if (!resultType->isVoidTy()) {
+							TargetData *TD = new TargetData(executor.kmodule->module);
+							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							ref<Expr> e;
+							e = ConstantExpr::alloc(bytesRead,width);
+							executor.bindLocal(target, state, e);
+						 }
+						return;
+					}
+					buffer = os->read(descriptor->getoffset(),Expr::Int32);
+					descriptor->incOffset();
+					descriptor->incOffset();
+					descriptor->incOffset();
+					descriptor->incOffset();
+					bytesRead+=4;
+					executor.executeMemoryOperation(state,true,targetBuf,buffer,0);//bind result with target
+					targetBuf = AddExpr::create(targetBuf,ConstantExpr::create(4,targetBuf->getWidth()));//targetBuf++
+					break;
+				case 8:
+					if(descriptor->getoffset()+7>=desc_size){
+						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						if (!resultType->isVoidTy()) {
+							TargetData *TD = new TargetData(executor.kmodule->module);
+							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							ref<Expr> e;
+							e = ConstantExpr::alloc(bytesRead,width);
+							executor.bindLocal(target, state, e);
+						 }
+						return;
+					}
+					buffer = os->read(descriptor->getoffset(),Expr::Int64);
+					descriptor->incOffset();
+					descriptor->incOffset();
+					descriptor->incOffset();
+					descriptor->incOffset();
+					descriptor->incOffset();
+					descriptor->incOffset();
+					descriptor->incOffset();
+					descriptor->incOffset();
+					bytesRead+=8;
+					executor.executeMemoryOperation(state,true,targetBuf,buffer,0);//bind result with target
+					targetBuf = AddExpr::create(targetBuf,ConstantExpr::create(8,targetBuf->getWidth()));//targetBuf++
+					break;
+				default:
+					if(descriptor->getoffset()+size-1>=desc_size){
+						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						if (!resultType->isVoidTy()) {
+							TargetData *TD = new TargetData(executor.kmodule->module);
+							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							ref<Expr> e;
+							e = ConstantExpr::alloc(bytesRead,width);
+							executor.bindLocal(target, state, e);
+						 }
+						return;
+					}
+					klee_warning("Fread Warning: Not reading size 1 2 4 or 8, may not be supported!");
+					buffer = os->read(descriptor->getoffset(),size);
+					for(int j = 0; j < size; j++){
+						descriptor->incOffset();
+					}
+					bytesRead+=size;
+					executor.executeMemoryOperation(state,true,targetBuf,buffer,0);//bind result with target
+					targetBuf = AddExpr::create(targetBuf,ConstantExpr::create(size,targetBuf->getWidth()));//targetBuf++
+					break;
+				}
+			}
+		}
+}
+
+void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
+        KInstruction *target,
+        std::vector<ref<Expr> > &arguments){
+		assert(arguments.size()==4 && "Wrong number of arguments for fscanf");
+		ref<ConstantExpr> value;
+		executor.solver->getValue(state,arguments[3],value);
+		int fileid = value.get()->getZExtValue();
+		executor.solver->getValue(state,arguments[2],value);
+		int count = value.get()->getZExtValue();
+		executor.solver->getValue(state,arguments[1],value);
+		int size = value.get()->getZExtValue();
+		ref<Expr> bufferLocation = arguments[0];
+
+		Executor::ExactResolutionList rl;
+		executor.resolveExact(state, bufferLocation, rl, "fwrite");
+		for (Executor::ExactResolutionList::iterator erit = rl.begin(),
+				 erie = rl.end(); erit != erie; ++erit) {
+			ObjectPair bufferop = erit->first;
+
+			ExecutionState *sinit = erit->second;
+			ExecutionState::fileDesc* descriptor = sinit->getBuffer(fileid);
+			ObjectPair op = descriptor->getBuffer();
+			const MemoryObject* mo = op.first;
+			int desc_size = descriptor->getsize();
+			int bytesWritten = 0;
+			ref<ConstantExpr> streamLocation = mo->getBaseExpr();
+
+			for(int i = 0; i < count * size; i++){
+				if(descriptor->getoffset() >= desc_size){//eof reached, number of bytes read returned;
+					LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+					if (!resultType->isVoidTy()) {
+						TargetData *TD = new TargetData(executor.kmodule->module);
+						unsigned width = TD->getTypeAllocSizeInBits(resultType);
+						ref<Expr> e;
+						e = ConstantExpr::alloc(bytesWritten,width);
+						executor.bindLocal(target, state, e);
+					 }
+					return;
+				}
+				ref<Expr> tbw = bufferop.second->read8(i);//tbw = to be written
+				ref<Expr> writtenLoc = AddExpr::create(streamLocation,ConstantExpr::create(descriptor->getoffset(),streamLocation->getWidth()));
+				executor.executeMemoryOperation(state,true,writtenLoc,tbw,0);//bind result with target
+				descriptor->incOffset();
+			}
+		}
 }
