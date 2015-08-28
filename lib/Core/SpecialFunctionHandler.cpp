@@ -1436,6 +1436,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 					}
 
 					else if(*it =='\t'||*it == '\n' ||*it == '\v' || *it== '\f' || *it == '\r' || *it == ' '){//add tab space etc..
+						descriptor->decOffset();//Because we have already incremented, and now it is a skip, we need to avoid over reading...
 						stateProcessed.push_back(*s);
 					}
 					else{
