@@ -1436,8 +1436,53 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 					}
 
 					else if(*it =='\t'||*it == '\n' ||*it == '\v' || *it== '\f' || *it == '\r' || *it == ' '){//add tab space etc..
-						descriptor->decOffset();//Because we have already incremented, and now it is a skip, we need to avoid over reading...
-						stateProcessed.push_back(*s);
+						if((it+1)==format.end()){//if last white space, we need to get rid of all white spaces after current pointer in file
+							result = true;
+							while (result) {
+								ref<ConstantExpr> spacechar = ConstantExpr::create((uint64_t)' ',ConstantExpr::Int8);
+								ref<ConstantExpr> tchar = ConstantExpr::create((uint64_t)'\t',ConstantExpr::Int8);
+								ref<ConstantExpr> nchar = ConstantExpr::create((uint64_t)'\n',ConstantExpr::Int8);
+								ref<ConstantExpr> vchar = ConstantExpr::create((uint64_t)'\v',ConstantExpr::Int8);
+								ref<ConstantExpr> fchar = ConstantExpr::create((uint64_t)'\f',ConstantExpr::Int8);
+								ref<ConstantExpr> rchar = ConstantExpr::create((uint64_t)'\r',ConstantExpr::Int8);
+								ref<Expr> spaceeq = EqExpr::create(spacechar,bufferchar);
+								ref<Expr> teq = EqExpr::create(tchar,bufferchar);
+								ref<Expr> neq = EqExpr::create(nchar,bufferchar);
+								ref<Expr> veq = EqExpr::create(vchar,bufferchar);
+								ref<Expr> feq = EqExpr::create(fchar,bufferchar);
+								ref<Expr> req = EqExpr::create(rchar,bufferchar);
+								ref<Expr> firstor = OrExpr::create(spaceeq,teq);
+								ref<Expr> secondor = OrExpr::create(neq,veq);
+								ref<Expr> thirdor = OrExpr::create(feq,req);
+								ref<Expr> lastor = OrExpr::create(OrExpr::create(firstor,secondor),thirdor);
+								bool success =	executor.solver->mustBeTrue(**s,lastor,result);//Gladtbx: Must be true OR May be true, it is a question.
+								assert(success && "fscanf solver failure");
+								if(result){//a white character found, move to next char
+									if(descriptor->getoffset()>=size){
+										//return EOF
+										LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+										if (!resultType->isVoidTy()) {
+											TargetData *TD = new TargetData(executor.kmodule->module);
+											unsigned width = TD->getTypeAllocSizeInBits(resultType);
+											ref<Expr> e;
+											if((*s)->getBytesRead() == 0)
+												e = ConstantExpr::alloc(EOF,width);
+											else
+												e = ConstantExpr::alloc((*s)->getBytesRead(),width);
+											executor.bindLocal(target, **s, e);
+										 }
+										continue;
+									}
+									//if we are not out of buffer, we read the content of the buffer.
+									bufferchar = op.second->read8(descriptor->getoffset());
+									descriptor->incOffset();
+								}
+							}
+						}
+						else{
+							descriptor->decOffset();//Because we have already incremented, and now it is a skip, we need to avoid over reading...
+							stateProcessed.push_back(*s);
+						}
 					}
 					else{
 						ref<ConstantExpr> formatchar = ConstantExpr::create((uint64_t)*it,ConstantExpr::Int8);
