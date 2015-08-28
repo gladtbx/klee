@@ -1439,6 +1439,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 						if((it+1)==format.end()){//if last white space, we need to get rid of all white spaces after current pointer in file
 							result = true;
 							while (result) {
+								bufferchar->dump();
 								ref<ConstantExpr> spacechar = ConstantExpr::create((uint64_t)' ',ConstantExpr::Int8);
 								ref<ConstantExpr> tchar = ConstantExpr::create((uint64_t)'\t',ConstantExpr::Int8);
 								ref<ConstantExpr> nchar = ConstantExpr::create((uint64_t)'\n',ConstantExpr::Int8);
@@ -1479,10 +1480,8 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 								}
 							}
 						}
-						else{
-							descriptor->decOffset();//Because we have already incremented, and now it is a skip, we need to avoid over reading...
-							stateProcessed.push_back(*s);
-						}
+						descriptor->decOffset();//Because we have already incremented, and now it is a skip, we need to avoid over reading...
+						stateProcessed.push_back(*s);
 					}
 					else{
 						ref<ConstantExpr> formatchar = ConstantExpr::create((uint64_t)*it,ConstantExpr::Int8);
