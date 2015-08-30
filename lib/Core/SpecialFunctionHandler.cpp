@@ -1846,8 +1846,8 @@ void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
 		 * pointer bufferLocation.
 		 */
 
-		ref<Expr> offset;
 		bool inBounds;
+		std::vector<std::pair<std::pair<ObjectPair, ref<Expr> >, ExecutionState*> > workpool;
 		ResolutionList rl;
 		unsigned bytes = Expr::getMinBytesForWidth(Expr::Int8);//For fwrite, we always do byte by byte write.
 		ObjectPair op;
@@ -1865,7 +1865,7 @@ void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
 				address = executor.toConstant(state, address, "max-sym-array-size");
 			}
 
-			offset = mo->getOffsetExpr(address);
+			ref<Expr> offset = mo->getOffsetExpr(address);
 
 			executor.solver->setTimeout(executor.coreSolverTimeout);
 			bool success = executor.solver->mustBeTrue(state,
@@ -1876,6 +1876,11 @@ void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
 				state.pc = state.prevPC;
 				executor.terminateStateEarly(state, "Query timed out (bounds check).");
 				return;
+			}
+
+			if(inBounds){
+				workpool.push_back(std::pair<std::pair <ObjectPair, ref<Expr> >, ExecutionState*> (
+					std::pair<ObjectPair, ref<Expr> >(op,offset), &state));
 			}
 		}
 
@@ -1891,13 +1896,14 @@ void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
 
 			for (ResolutionList::iterator i = rl.begin(), ie = rl.end(); i != ie; ++i) {
 				const MemoryObject *mo = i->first;
+				ref<Expr> offset = mo->getOffsetExpr(address);
 				ref<Expr> inBounds = mo->getBoundsCheckPointer(address, bytes);
 
 				Executor::StatePair branches = executor.fork(*unbound, inBounds, true);
 				ExecutionState *bound = branches.first;
-				if(!bound){
-					rl.erase(i++);
-					i--;
+				if(bound){
+					workpool.push_back(std::pair<std::pair <ObjectPair, ref<Expr> >, ExecutionState*> (
+										std::pair<ObjectPair, ref<Expr> >(*i,offset), bound));
 				}
 
 				// bound can be 0 on failure or overlapped
@@ -1918,14 +1924,14 @@ void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
 				}
 			}
 		}
-		else{
-			rl.push_back(op);
-		}
 
-		for (ResolutionList::iterator opit = rl.begin(), ie = rl.end(); opit != ie; ++opit) {
-			ExecutionState::fileDesc* descriptor = state.getBuffer(fileid);
+		for (std::vector<std::pair<std::pair<ObjectPair, ref<Expr> >, ExecutionState*> >::iterator opit = workpool.begin(),
+				ie = workpool.end(); opit != ie; ++opit) {
+			ExecutionState::fileDesc* descriptor = opit->second->getBuffer(fileid);
 			int desc_size = descriptor->getsize();
 			int bytesWritten = 0;
+			ref<Expr> offset = opit->first.second;
+			ref<ConstantExpr> bufferLocation = descriptor->getBuffer().first->getBaseExpr();
 
 
 			for(int i = 0; i < count * size; i++){
@@ -1936,14 +1942,14 @@ void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
 						unsigned width = TD->getTypeAllocSizeInBits(resultType);
 						ref<Expr> e;
 						e = ConstantExpr::alloc(bytesWritten,width);
-						executor.bindLocal(target, state, e);
+						executor.bindLocal(target, *(opit->second), e);
 					 }
 					return;
 				}
 				ref<Expr> addOffset = AddExpr::create(offset,ConstantExpr::create(i,offset->getWidth()));
-				ref<Expr> tbw = opit->second->read(addOffset,Expr::Int8);//tbw = to be written
-				ref<Expr> writtenLoc = AddExpr::create(address,ConstantExpr::create(descriptor->getoffset(),address->getWidth()));
-				executor.executeMemoryOperation(state,true,writtenLoc,tbw,0);//bind result with target
+				ref<Expr> tbw = opit->first.first.second->read(addOffset,Expr::Int8);//tbw = to be written
+				ref<Expr> writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
+				executor.executeMemoryOperation(*(opit->second),true,writtenLoc,tbw,0);//bind result with target
 				descriptor->incOffset();
 			}
 		}
