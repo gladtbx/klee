@@ -3240,6 +3240,8 @@ void Executor::executeFree(ExecutionState &state,
   if (zeroPointer.second) { // address != 0
     ExactResolutionList rl;
     resolveExact(*zeroPointer.second, address, rl, "free");
+    //Gladtbx: When free, the returned memory object must be exact of what we the pointer points to
+    //which means cannot be some location within the range of the memory object.
     
     for (Executor::ExactResolutionList::iterator it = rl.begin(), 
            ie = rl.end(); it != ie; ++it) {
