@@ -40,6 +40,10 @@ using namespace klee;
 ///
 cl::opt<bool>
 symbolicFileIO("symbolicFileIO",cl::desc("Make File I/O symbolic, including Fopen,Fscanf,Fprintf,Fputs"),cl::init(false));
+
+cl::opt<unsigned>
+  MaxSymArraySize("max-sym-array-size",
+                  cl::init(0));
 // FIXME: We are more or less committed to requiring an intrinsic
 // library these days. We can move some of this stuff there,
 // especially things like realloc which have complicated semantics
@@ -574,6 +578,8 @@ void SpecialFunctionHandler::handleGetObjSize(ExecutionState &state,
          "invalid number of arguments to klee_get_obj_size");
   Executor::ExactResolutionList rl;
   executor.resolveExact(state, arguments[0], rl, "klee_get_obj_size");
+  //Here because it is trying to get the size of Memory Object, an exact
+  // match is needed. Gladtbx
   for (Executor::ExactResolutionList::iterator it = rl.begin(), 
          ie = rl.end(); it != ie; ++it) {
     executor.bindLocal(target, *it->second, 
@@ -864,6 +870,9 @@ void SpecialFunctionHandler::handleMakeIOBuffer(ExecutionState &state,
 		std::string filename = readStringAtAddress(state, arguments[1]);
 		Executor::ExactResolutionList rl;
 		executor.resolveExact(state, arguments[0], rl, "mark_IO_buffer");
+		//here arguments[0] is the array that is created as buffer. It must be the whole
+		// array. Using partial array as buffer can be done how ever I don't see any necessity
+		// of doing so. Gladtbx
 	    for (Executor::ExactResolutionList::iterator it = rl.begin(),
 		         ie = rl.end(); it != ie; ++it) {
 	    	ObjectPair op = it->first;
@@ -1190,6 +1199,8 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 		 */
 		Executor::ExactResolutionList rl;
 		executor.resolveExact(state, bufferLocation, rl, "fscanf");
+		//Here buffer location must be the starting point of the buffer memory object, so exact match
+		// is needed. Gladtbx
 		for (Executor::ExactResolutionList::iterator erit = rl.begin(),
 				 erie = rl.end(); erit != erie; ++erit) {
 			ObjectPair op = erit->first;
@@ -1637,7 +1648,9 @@ void SpecialFunctionHandler::handleFread(ExecutionState &state,
 		const MemoryObject* mo = op.first;
 		ref<ConstantExpr> bufferLocation = mo->getBaseExpr();
 		Executor::ExactResolutionList rl;
-		executor.resolveExact(state, bufferLocation, rl, "fscanf");
+		executor.resolveExact(state, bufferLocation, rl, "fread");
+		//Here buffer location must be the starting point of the buffer memory object, so exact match
+		// is needed. Gladtbx
 		for (Executor::ExactResolutionList::iterator erit = rl.begin(),
 				 erie = rl.end(); erit != erie; ++erit) {
 			ObjectPair op = erit->first;
@@ -1759,7 +1772,7 @@ void SpecialFunctionHandler::handleFread(ExecutionState &state,
 void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
         KInstruction *target,
         std::vector<ref<Expr> > &arguments){
-		assert(arguments.size()==4 && "Wrong number of arguments for fscanf");
+		assert(arguments.size()==4 && "Wrong number of arguments for fwrite");
 		ref<ConstantExpr> value;
 		executor.solver->getValue(state,arguments[3],value);
 		int fileid = value.get()->getZExtValue();
@@ -1767,21 +1780,93 @@ void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
 		int count = value.get()->getZExtValue();
 		executor.solver->getValue(state,arguments[1],value);
 		int size = value.get()->getZExtValue();
-		ref<Expr> bufferLocation = arguments[0];
+		ref<Expr> address = arguments[0];
+		/*
+		 * Here we copy part of the load instruction from the Executor.cpp to read from the
+		 * pointer bufferLocation.
+		 */
 
-		Executor::ExactResolutionList rl;
-		executor.resolveExact(state, bufferLocation, rl, "fwrite");
-		for (Executor::ExactResolutionList::iterator erit = rl.begin(),
-				 erie = rl.end(); erit != erie; ++erit) {
-			ObjectPair bufferop = erit->first;
+		ref<Expr> offset;
+		bool inBounds;
+		ResolutionList rl;
+		unsigned bytes = Expr::getMinBytesForWidth(Expr::Int8);//For fwrite, we always do byte by byte write.
+		ObjectPair op;
+		bool success;
+		executor.solver->setTimeout(executor.coreSolverTimeout);
+		if (!state.addressSpace.resolveOne(state, executor.solver, address, op, success)) {
+			address = executor.toConstant(state, address, "resolveOne failure");
+		  success = state.addressSpace.resolveOne(cast<ConstantExpr>(address), op);
+		}
+		executor.solver->setTimeout(0);
+		if (success) {
+			const MemoryObject *mo = op.first;
 
-			ExecutionState *sinit = erit->second;
-			ExecutionState::fileDesc* descriptor = sinit->getBuffer(fileid);
-			ObjectPair op = descriptor->getBuffer();
-			const MemoryObject* mo = op.first;
+			if (MaxSymArraySize && mo->size>=MaxSymArraySize) {
+				address = executor.toConstant(state, address, "max-sym-array-size");
+			}
+
+			offset = mo->getOffsetExpr(address);
+
+			executor.solver->setTimeout(executor.coreSolverTimeout);
+			bool success = executor.solver->mustBeTrue(state,
+					mo->getBoundsCheckOffset(offset, bytes),
+					inBounds);
+			executor.solver->setTimeout(0);
+			if (!success) {
+				state.pc = state.prevPC;
+				executor.terminateStateEarly(state, "Query timed out (bounds check).");
+				return;
+			}
+		}
+
+		//If resolve not successful or out of bounds resolve
+		if(!success || !inBounds){
+			executor.solver->setTimeout(executor.coreSolverTimeout);
+			bool incomplete = state.addressSpace.resolve(state, executor.solver, address, rl,
+					0, executor.coreSolverTimeout);
+			executor.solver->setTimeout(0);
+
+			// XXX there is some query wasteage here. who cares?
+			ExecutionState *unbound = &state;
+
+			for (ResolutionList::iterator i = rl.begin(), ie = rl.end(); i != ie; ++i) {
+				const MemoryObject *mo = i->first;
+				ref<Expr> inBounds = mo->getBoundsCheckPointer(address, bytes);
+
+				Executor::StatePair branches = executor.fork(*unbound, inBounds, true);
+				ExecutionState *bound = branches.first;
+				if(!bound){
+					rl.erase(i++);
+					i--;
+				}
+
+				// bound can be 0 on failure or overlapped
+				unbound = branches.second;
+				if (!unbound)
+					break;
+			}
+
+			// XXX should we distinguish out of bounds and overlapped cases?
+			if (unbound) {
+				if (incomplete) {
+					executor.terminateStateEarly(*unbound, "Query timed out (resolve).");
+				} else {
+					executor.terminateStateOnError(*unbound,
+							"memory error: out of bound pointer",
+							"ptr.err",
+							executor.getAddressInfo(*unbound, address));
+				}
+			}
+		}
+		else{
+			rl.push_back(op);
+		}
+
+		for (ResolutionList::iterator opit = rl.begin(), ie = rl.end(); opit != ie; ++opit) {
+			ExecutionState::fileDesc* descriptor = state.getBuffer(fileid);
 			int desc_size = descriptor->getsize();
 			int bytesWritten = 0;
-			ref<ConstantExpr> streamLocation = mo->getBaseExpr();
+
 
 			for(int i = 0; i < count * size; i++){
 				if(descriptor->getoffset() >= desc_size){//eof reached, number of bytes read returned;
@@ -1795,8 +1880,9 @@ void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
 					 }
 					return;
 				}
-				ref<Expr> tbw = bufferop.second->read8(i);//tbw = to be written
-				ref<Expr> writtenLoc = AddExpr::create(streamLocation,ConstantExpr::create(descriptor->getoffset(),streamLocation->getWidth()));
+				ref<Expr> addOffset = AddExpr::create(offset,ConstantExpr::create(i,offset->getWidth()));
+				ref<Expr> tbw = opit->second->read(addOffset,Expr::Int8);//tbw = to be written
+				ref<Expr> writtenLoc = AddExpr::create(address,ConstantExpr::create(descriptor->getoffset(),address->getWidth()));
 				executor.executeMemoryOperation(state,true,writtenLoc,tbw,0);//bind result with target
 				descriptor->incOffset();
 			}
