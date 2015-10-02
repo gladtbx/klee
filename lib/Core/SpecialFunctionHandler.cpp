@@ -99,6 +99,11 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("\01__isoc99_fscanf",handleFscanf,true),
   add("fscanf",handleFscanf,true),
   add("__isoc99_fscanf",handleFscanf,true),
+  add("__isoc99_sscanf",handleSscanf,true),
+  add("\01__isoc99_sscanf",handleSscanf,true),
+
+
+  add("sscanf",handleSscanf,true),
   add("fprintf",handleFprintf,true),
   add("fputc",handleFputc,true),
   add("fread",handleFread,true),
@@ -183,7 +188,19 @@ void SpecialFunctionHandler::prepare() {
 		  continue;
 	  }
     }
+    if(hi.name == "\01__isoc99_sscanf"){
+	  if(!symbolicFileIO){
+		  handlerInfo[i] = {"",NULL,false,false,false};
+		  continue;
+	  }
+    }
     if(hi.name == "__isoc99_fscanf"){
+  	  if(!symbolicFileIO){
+  		  handlerInfo[i] = {"",NULL,false,false,false};
+  		  continue;
+  	  }
+    }
+    if(hi.name == "__isoc99_sscanf"){
   	  if(!symbolicFileIO){
   		  handlerInfo[i] = {"",NULL,false,false,false};
   		  continue;
@@ -221,6 +238,13 @@ void SpecialFunctionHandler::prepare() {
   		  handlerInfo[i] = {"",NULL,false,false,false};
   		  continue;
     	}
+    }
+
+    if(hi.name == "sscanf"){
+       	if(!symbolicFileIO){
+   		  handlerInfo[i] = {"",NULL,false,false,false};
+   		  continue;
+     	}
     }
 
     Function *f = executor.kmodule->module->getFunction(hi.name);
@@ -1170,7 +1194,28 @@ void SpecialFunctionHandler::processScanHex(ExecutionState *current_state,Expr::
 	}
 }
 
-
+void SpecialFunctionHandler::handleSscanf(ExecutionState &state,
+		KInstruction *target,
+        std::vector<ref<Expr> > &arguments){
+		klee_warning("Sscanf");
+		Executor::ExactResolutionList rl;
+		std::string wr = "r";
+		executor.resolveExact(state, arguments[0], rl, "mark_IO_buffer");
+		//here arguments[0] is the array that is created as buffer. It must be the whole
+		// array. Using partial array as buffer can be done how ever I don't see any necessity
+		// of doing so. Gladtbx
+		for (Executor::ExactResolutionList::iterator it = rl.begin(),
+		         ie = rl.end(); it != ie; ++it) {
+		   	ObjectPair op = it->first;
+		   	ExecutionState *s = it->second;
+		   	std::pair<ObjectPair, int> mobuffer(op,op.first->size);
+		   	int id = s->createFileDesc(mobuffer,wr);
+		   	ref<ConstantExpr> rid = ConstantExpr::create(id,ConstantExpr::Int32);
+		   	std::vector<ref<Expr> > newargs(arguments);
+		   	newargs[0] = rid;
+		   	handleFscanf(*s,target,newargs);
+		}
+}
 
 void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
         KInstruction *target,
@@ -1387,10 +1432,9 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 					}
 
 					else if(*it =='\t'||*it == '\n' ||*it == '\v' || *it== '\f' || *it == '\r' || *it == ' '){//add tab space etc..
-						if((it+1)==format.end()){//if last white space, we need to get rid of all white spaces after current pointer in file
+						//if((it+1)==format.end()){//if last white space, we need to get rid of all white spaces after current pointer in file
 							result = true;
 							while (result) {
-								bufferchar->dump();
 								ref<ConstantExpr> spacechar = ConstantExpr::create((uint64_t)' ',ConstantExpr::Int8);
 								ref<ConstantExpr> tchar = ConstantExpr::create((uint64_t)'\t',ConstantExpr::Int8);
 								ref<ConstantExpr> nchar = ConstantExpr::create((uint64_t)'\n',ConstantExpr::Int8);
@@ -1430,7 +1474,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 									descriptor->incOffset();
 								}
 							}
-						}
+						//}
 						descriptor->decOffset();//Because we have already incremented, and now it is a skip, we need to avoid over reading...
 						stateProcessed.push_back(*s);
 					}
@@ -1440,6 +1484,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 						assert(success && "fscanf solver failure");
 						if(result){
 							//a match can be found so we move on...
+
 							stateProcessed.push_back(*s);
 						}
 						else{
