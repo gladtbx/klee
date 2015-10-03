@@ -105,6 +105,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
 
   add("sscanf",handleSscanf,true),
   add("fprintf",handleFprintf,true),
+  //add("printf",handleprintf,true),
   add("fputc",handleFputc,true),
   add("fread",handleFread,true),
   add("fwrite",handleFwrite,true),
@@ -218,7 +219,12 @@ void SpecialFunctionHandler::prepare() {
 		  continue;
 	  }
     }
-
+    if(hi.name == "printf"){
+	  if(!symbolicFileIO){
+		  handlerInfo[i] = {"",NULL,false,false,false};
+		  continue;
+	  }
+    }
     if(hi.name == "fclose"){
 	  if(!symbolicFileIO){
 		  handlerInfo[i] = {"",NULL,false,false,false};
@@ -1225,8 +1231,8 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 		ref<ConstantExpr> value;
 		executor.solver->getValue(state,arguments[0],value);
 		int fileid = value.get()->getZExtValue();
-		klee_warning("Fileid: %d", fileid);
-		klee_warning("Format String: %s", format.c_str());
+		//klee_warning("Fileid: %d", fileid);
+		//klee_warning("Format String: %s", format.c_str());
 		/*
 		 * Start reading from the buffer
 		 */
@@ -1282,6 +1288,48 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 					ref<Expr> bufferchar = op.second->read8(descriptor->getoffset());
 					descriptor->incOffset();
 					if(*it == '%'){//Read to dest
+						//Remove all the spaces
+						result = true;
+						while (result) {
+							ref<ConstantExpr> spacechar = ConstantExpr::create((uint64_t)' ',ConstantExpr::Int8);
+							ref<ConstantExpr> tchar = ConstantExpr::create((uint64_t)'\t',ConstantExpr::Int8);
+							ref<ConstantExpr> nchar = ConstantExpr::create((uint64_t)'\n',ConstantExpr::Int8);
+							ref<ConstantExpr> vchar = ConstantExpr::create((uint64_t)'\v',ConstantExpr::Int8);
+							ref<ConstantExpr> fchar = ConstantExpr::create((uint64_t)'\f',ConstantExpr::Int8);
+							ref<ConstantExpr> rchar = ConstantExpr::create((uint64_t)'\r',ConstantExpr::Int8);
+							ref<Expr> spaceeq = EqExpr::create(spacechar,bufferchar);
+							ref<Expr> teq = EqExpr::create(tchar,bufferchar);
+							ref<Expr> neq = EqExpr::create(nchar,bufferchar);
+							ref<Expr> veq = EqExpr::create(vchar,bufferchar);
+							ref<Expr> feq = EqExpr::create(fchar,bufferchar);
+							ref<Expr> req = EqExpr::create(rchar,bufferchar);
+							ref<Expr> firstor = OrExpr::create(spaceeq,teq);
+							ref<Expr> secondor = OrExpr::create(neq,veq);
+							ref<Expr> thirdor = OrExpr::create(feq,req);
+							ref<Expr> lastor = OrExpr::create(OrExpr::create(firstor,secondor),thirdor);
+							bool success =	executor.solver->mustBeTrue(**s,lastor,result);//Gladtbx: Must be true OR May be true, it is a question.
+							assert(success && "fscanf solver failure");
+							if(result){//a white character found, move to next char
+								if(descriptor->getoffset()>=size){
+									//return EOF
+									LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+									if (!resultType->isVoidTy()) {
+										TargetData *TD = new TargetData(executor.kmodule->module);
+										unsigned width = TD->getTypeAllocSizeInBits(resultType);
+										ref<Expr> e;
+										if((*s)->getBytesRead() == 0)
+											e = ConstantExpr::alloc(EOF,width);
+										else
+											e = ConstantExpr::alloc((*s)->getBytesRead(),width);
+										executor.bindLocal(target, **s, e);
+									 }
+									continue;
+								}
+								//if we are not out of buffer, we read the content of the buffer.
+								bufferchar = op.second->read8(descriptor->getoffset());
+								descriptor->incOffset();
+							}
+						}
 						int argNum = (*s)->getBytesRead()+2;
 						if(argNum >= arguments.size()){
 							//Not enough parameters to be read to.
@@ -1309,10 +1357,19 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 						char specifier[3]={'\0','\0','\0'};
 						int index = 0;
 						std::string::iterator nextit = it+1;//if it points out of bound?
+
 						if(nextit == format.end()){
 							//warning.Gladtbx:Maybe should be error?!
 							klee_warning("Nothing behind % sign!");
 							continue;
+						}
+						while(*nextit == '0' ||*nextit == '1' ||*nextit == '2' ||*nextit == '3' ||*nextit == '4' ||*nextit == '5' ||*nextit == '6' ||*nextit == '7' ||*nextit == '8' ||*nextit == '9'){
+							nextit++;//Fixme:Add support for numbers here;Gladtbx
+							if(nextit == format.end()){
+								//warning.Gladtbx:Maybe should be error?!
+								klee_warning("Nothing behind % sign!");
+								continue;
+							}
 						}
 						specifier[index] = *nextit;
 						//first check if it is length. include'l','ll','L','h','hh','j','z','t'
@@ -1332,6 +1389,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 								specifier[index] = *nextit;
 							}
 						}
+
 						//clear neg flag and previous read data
 						(*s)->ioBuffer.clear();
 						//if no length is found we have the specifier we need
@@ -1370,9 +1428,9 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 
 							if(signbranches.second){//if positive
 								if(specifier[0] == 'd')
-									processScanInt(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target);
+									processScanInt(signbranches.second,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target);
 								else
-									processScanOct(signbranches.first,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target);
+									processScanOct(signbranches.second,ConstantExpr::Int32,bufferchar,targetBuf,fileid,op,&stateProcessed,target);
 							}
 							//bytesread++;
 						}
@@ -1417,18 +1475,23 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 						else if(specifier[0] == 'u'){
 
 						}
-						//if not a correct specifier, return numbytes read;
-						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
-						if (!resultType->isVoidTy()) {
-							TargetData *TD = new TargetData(executor.kmodule->module);
-							unsigned width = TD->getTypeAllocSizeInBits(resultType);
-							ref<Expr> e;
-							if((*s)->getBytesRead() == 0)
-								e = ConstantExpr::alloc(EOF,width);
-							else
-								e = ConstantExpr::alloc((*s)->getBytesRead(),width);
-							executor.bindLocal(target, **s, e);
-						 }
+						else if(specifier[0] == 's'){
+
+						}
+						//else{
+							//if not a correct specifier, return numbytes read;
+							LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+							if (!resultType->isVoidTy()) {
+								TargetData *TD = new TargetData(executor.kmodule->module);
+								unsigned width = TD->getTypeAllocSizeInBits(resultType);
+								ref<Expr> e;
+								if((*s)->getBytesRead() == 0)
+									e = ConstantExpr::alloc(EOF,width);
+								else
+									e = ConstantExpr::alloc((*s)->getBytesRead(),width);
+								executor.bindLocal(target, **s, e);
+							//}
+						}
 					}
 
 					else if(*it =='\t'||*it == '\n' ||*it == '\v' || *it== '\f' || *it == '\r' || *it == ' '){//add tab space etc..
@@ -1537,6 +1600,15 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 		}
 }
 
+void SpecialFunctionHandler::handleprintf(ExecutionState &state,
+        KInstruction *target,
+        std::vector<ref<Expr> > &arguments){
+	std::vector<ref<Expr> > newargs(arguments);
+	ref<ConstantExpr> zero = ConstantExpr::create(0,ConstantExpr::Int32);
+	newargs.insert(newargs.begin(),zero);
+	handleFprintf(state,target,newargs);
+}
+
 void SpecialFunctionHandler::handleFprintf(ExecutionState &state,
         KInstruction *target,
         std::vector<ref<Expr> > &arguments){
@@ -1545,8 +1617,8 @@ void SpecialFunctionHandler::handleFprintf(ExecutionState &state,
 	ref<ConstantExpr> value;
 	executor.solver->getValue(state,arguments[0],value);
 	int fileid = value.get()->getZExtValue();
-	klee_warning("Fileid: %d", fileid);
-	klee_warning("Format String: %s", format.c_str());
+	//klee_warning("Fileid: %d", fileid);
+	//klee_warning("Format String: %s", format.c_str());
 	/*
 	 * Start reading from the buffer
 	 */

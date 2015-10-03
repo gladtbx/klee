@@ -166,6 +166,7 @@ namespace klee {
     HANDLER(handleFscanf);
     HANDLER(handleSscanf);
     HANDLER(handleFprintf);
+    HANDLER(handleprintf);
     HANDLER(handleFputc);
     HANDLER(handleClose);
     HANDLER(handleFread);
