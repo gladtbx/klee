@@ -214,7 +214,6 @@ bool MetaSMTSolverImpl<SolverContext>::computeInitialValues(
       ++stats::queriesValid;
     }
   }
-
   return (success);
 }
 
