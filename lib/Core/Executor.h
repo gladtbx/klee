@@ -453,6 +453,7 @@ private:
   void doDumpStates();
 
 
+
   bool ifTargetFunction(const llvm::Function *f){
 	  if(!f){
 //		  klee_warning("Gladtbx: Null pointer in ifTargetFunction encounter");
@@ -468,6 +469,10 @@ private:
   }
 
                 
+
+  void checkMemoryUsage();
+
+
 public:
   Executor(llvm::LLVMContext &ctx, const InterpreterOptions &opts,
       InterpreterHandler *ie);
