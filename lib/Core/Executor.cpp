@@ -1581,6 +1581,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       }
 
       // Track default branch values
+      //Gladtbx: isDefault = match = zero. default can be reached when nothing can be matched.
       ref<Expr> defaultValue = ConstantExpr::alloc(1, Expr::Bool);
 
       // iterate through all non-default cases but in order of the expressions
@@ -1589,6 +1590,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
                itE = expressionOrder.end();
            it != itE; ++it) {
         ref<Expr> match = EqExpr::create(cond, it->first);
+          //Gladtbx: match = condition evaluated to value
 
         // Make sure that the default value does not contain this target's value
         defaultValue = AndExpr::create(defaultValue, Expr::createIsZero(match));
