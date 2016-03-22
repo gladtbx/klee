@@ -459,11 +459,15 @@ bool assertCreatedPointEvaluatesToTrue(const Query &query,
       it != query.constraints.end(); ++it){
     ref<Expr> constraint = *it;
 
-    if (!canPerformConcreteAssignment(objects, constraint)) {
-      // We have to skip checking assigning to this constraint
-      continue;
-    }
+  // Add any additional bindings.
+  // The semantics of std::map should be to not insert a (key, value)
+  // pair if it already exists so we should continue to use the assignment
+  // from ``objects`` and ``values``.
+  if (retMap.size() > 0)
+    assign.bindings.insert(retMap.begin(), retMap.end());
 
+  for(ConstraintManager::constraint_iterator it = query.constraints.begin();
+      it != query.constraints.end(); ++it){
     ref<Expr> ret = assign.evaluate(*it);
 
     assert(isa<ConstantExpr>(ret) && "assignment evaluation did not result in constant");
