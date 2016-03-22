@@ -457,6 +457,13 @@ bool assertCreatedPointEvaluatesToTrue(const Query &query,
 
   for(ConstraintManager::constraint_iterator it = query.constraints.begin();
       it != query.constraints.end(); ++it){
+    ref<Expr> constraint = *it;
+
+    if (!canPerformConcreteAssignment(objects, constraint)) {
+      // We have to skip checking assigning to this constraint
+      continue;
+    }
+
     ref<Expr> ret = assign.evaluate(*it);
 
     assert(isa<ConstantExpr>(ret) && "assignment evaluation did not result in constant");
