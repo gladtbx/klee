@@ -112,7 +112,6 @@ void QueryLoggingSolver::finishQuery(bool success) {
 
 void QueryLoggingSolver::flushBuffer() {
   bool writeToFile = false;
-
   if ((0 == minQueryTimeToLog) ||
       (static_cast<int>(lastQueryTime * 1000) > minQueryTimeToLog)) {
     // we either do not limit logging queries or the query time

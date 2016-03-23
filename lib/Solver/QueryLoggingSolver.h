@@ -62,7 +62,6 @@ public:
                      const std::string &commentSign, int queryTimeToLog);
 
   virtual ~QueryLoggingSolver();
-
   /// implementation of the SolverImpl interface
   bool computeTruth(const Query &query, bool &isValid);
   bool computeValidity(const Query &query, Solver::Validity &result);
