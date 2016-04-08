@@ -820,6 +820,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
       assert(!replayKTest && "in replay mode, only one branch can be true.");
       
       //If we are at memory limit, we skip forking.
+
       if ((MaxMemoryInhibit && atMemoryLimit) || 
           current.forkDisabled ||
           inhibitForking || 
