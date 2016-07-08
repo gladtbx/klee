@@ -472,6 +472,7 @@ private:
 
   void checkMemoryUsage();
   void printDebugInstructions(ExecutionState &state);
+  void doDumpStates();
 
 
 public:
