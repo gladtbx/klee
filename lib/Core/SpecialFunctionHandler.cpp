@@ -28,6 +28,14 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/IR/DataLayout.h"
 
+#if LLVM_VERSION_CODE <= LLVM_VERSION(3, 1)
+#include "llvm/Target/TargetData.h"
+#elif LLVM_VERSION_CODE <= LLVM_VERSION(3, 2)
+#include "llvm/DataLayout.h"
+#else
+#include "llvm/IR/DataLayout.h"
+#endif
+
 #include <errno.h>
 #include <sstream>
 
