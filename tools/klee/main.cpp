@@ -40,6 +40,7 @@
 #include "llvm/LLVMContext.h"
 #include "llvm/Support/FileSystem.h"
 #endif
+#include "llvm/Support/Errno.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/Support/CommandLine.h"
@@ -1485,10 +1486,8 @@ int main(int argc, char **argv, char **envp) {
     if (RunInDir != "") {
       int res = chdir(RunInDir.c_str());
       if (res < 0) {
-        char info[128];
-        char *str = strerror_r(errno, info, sizeof(info));
         klee_error("Unable to change directory to: %s - %s", RunInDir.c_str(),
-                   str);
+                   sys::StrError(errno).c_str());
       }
     }
 
@@ -1550,10 +1549,8 @@ int main(int argc, char **argv, char **envp) {
     if (RunInDir != "") {
       int res = chdir(RunInDir.c_str());
       if (res < 0) {
-        char info[128];
-        char *str = strerror_r(errno, info, sizeof(info));
         klee_error("Unable to change directory to: %s - %s", RunInDir.c_str(),
-                   str);
+                   sys::StrError(errno).c_str());
       }
     }
     interpreter->runFunctionAsMain(mainFn, pArgc, pArgv, pEnvp);
