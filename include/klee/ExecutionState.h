@@ -309,7 +309,7 @@ public:
   }
 
   fileDesc* getBuffer(int id){
-	  return &fileDescriptor[id];
+	  return &fileDescriptor[id-1];
   }
 
   std::pair<ObjectPair, int> lookupFile(std::string fileName){
@@ -324,7 +324,7 @@ public:
   }
 
   int createFileDesc(std::pair<ObjectPair, int> buffer, std::string wr){
-	  int id = fileDescriptor.size();
+	  int id = fileDescriptor.size() + 1;
 	  fileDesc entry(id, buffer, wr);
 	  fileDescriptor.push_back(entry);
 	  return id;
