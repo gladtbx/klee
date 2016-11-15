@@ -23,7 +23,6 @@
 #include "klee/Internal/Support/ErrorHandling.h"
 
 #include "llvm/Support/CommandLine.h"
-#include <stdio.h>
 
 using namespace klee;
 using namespace llvm;
@@ -85,7 +84,7 @@ public:
   
   bool computeTruth(const Query&, bool &isValid);
   bool computeValidity(const Query&, Solver::Validity &result);
-  bool computeValue(const Query&, ref<Expr> &result, const Query& full_query);
+  bool computeValue(const Query&, ref<Expr> &result);
   bool computeInitialValues(const Query&,
                             const std::vector<const Array*> &objects,
                             std::vector< std::vector<unsigned char> > &values,
@@ -318,12 +317,11 @@ bool CexCachingSolver::computeTruth(const Query& query,
 }
 
 bool CexCachingSolver::computeValue(const Query& query,
-                                    ref<Expr> &result,
-                                    const Query& full_query) {
+                                    ref<Expr> &result) {
   TimerStatIncrementer t(stats::cexCacheTime);
 
   Assignment *a;
-  if (!getAssignment(full_query.withFalse(), a))
+  if (!getAssignment(query.withFalse(), a))
     return false;
   assert(a && "computeValue() must have assignment");
   result = a->evaluate(query.expr);

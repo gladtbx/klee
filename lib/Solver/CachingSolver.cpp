@@ -79,9 +79,9 @@ public:
 
   bool computeValidity(const Query&, Solver::Validity &result);
   bool computeTruth(const Query&, bool &isValid);
-  bool computeValue(const Query& query, ref<Expr> &result, const Query& full_query) {
+  bool computeValue(const Query& query, ref<Expr> &result) {
     ++stats::queryCacheMisses;
-    return solver->impl->computeValue(query, result,full_query);
+    return solver->impl->computeValue(query, result);
   }
   bool computeInitialValues(const Query& query,
                             const std::vector<const Array*> &objects,

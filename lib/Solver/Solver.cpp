@@ -86,7 +86,7 @@ bool Solver::getValue(const Query& query, ref<ConstantExpr> &result) {
 
   // FIXME: Push ConstantExpr requirement down.
   ref<Expr> tmp;
-  if (!impl->computeValue(query, tmp, query))
+  if (!impl->computeValue(query, tmp))
     return false;
   
   result = cast<ConstantExpr>(tmp);
@@ -220,7 +220,6 @@ std::pair< ref<Expr>, ref<Expr> > Solver::getRange(const Query& query) {
                         ConstantExpr::create(max, width));
 }
 
-
 void Query::dump() const {
   llvm::errs() << "Constraints [\n";
   for (ConstraintManager::const_iterator i = constraints.begin();
@@ -232,4 +231,3 @@ void Query::dump() const {
   expr->dump();
   llvm::errs() << "]\n";
 }
-
