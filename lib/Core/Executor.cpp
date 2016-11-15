@@ -1197,7 +1197,7 @@ void Executor::executeCall(ExecutionState &state,
                            std::vector< ref<Expr> > &arguments) {
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {
-	 klee_warning(f->getNameStr().c_str());
+	 klee_warning(f->getName().data());
     switch(f->getIntrinsicID()) {
     case Intrinsic::not_intrinsic:
       // state may be destroyed by this call, cannot touch

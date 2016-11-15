@@ -8,9 +8,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "klee/Internal/Module/KInstruction.h"
-#include "llvm/Instruction.h"
-#include "llvm/BasicBlock.h"
-#include "llvm/Function.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Function.h"
 
 #ifndef KLEE_KINSTITERATOR_H
 #define KLEE_KINSTITERATOR_H
@@ -42,7 +42,7 @@ namespace klee {
 
     KInstruction *operator ->() const { return *it; }
     std::string getFuncName() const{
-    	return (*it)->inst->getParent()->getParent()->getNameStr();
+    	return (*it)->inst->getParent()->getParent()->getName();
     }
   };
 } // End klee namespace

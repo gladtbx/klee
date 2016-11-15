@@ -10,8 +10,8 @@
 #ifndef KLEE_SPECIALFUNCTIONHANDLER_H
 #define KLEE_SPECIALFUNCTIONHANDLER_H
 
-#include "llvm/Type.h"
-#include "llvm/Target/TargetData.h"
+#include "llvm/IR/Type.h"
+//#include "llvm/Target/TargetData.h"
 #include "llvm/Support/CommandLine.h"
 #include "AddressSpace.h"
 #include <iterator>
