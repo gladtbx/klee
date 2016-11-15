@@ -11,9 +11,7 @@
 
 #include "klee/Config/Version.h"
 #include "klee/Internal/Support/Debug.h"
-
-// FIXME: This does not belong here.
-#include "../Core/Common.h"
+#include "klee/Internal/Support/ErrorHandling.h"
 #include "../Core/SpecialFunctionHandler.h"
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 4)
@@ -446,7 +444,7 @@ Function *klee::getDirectCallTarget(CallSite cs) {
     return f;
   } else if (llvm::ConstantExpr *ce = dyn_cast<llvm::ConstantExpr>(v)) {
     if (ce->getOpcode()==Instruction::BitCast)
-      if (Function *f = dyn_cast<Function>(ce->getOperand(0)))
+      if (Function *f = dyn_cast<Function>(ce->getOperand(0)->stripPointerCasts()))
         return f;
 
     // NOTE: This assert may fire, it isn't necessarily a problem and
@@ -462,13 +460,15 @@ static bool valueIsOnlyCalled(const Value *v) {
        it != ie; ++it) {
     if (const Instruction *instr = dyn_cast<Instruction>(*it)) {
       if (instr->getOpcode()==0) continue; // XXX function numbering inst
-      if (!isa<CallInst>(instr) && !isa<InvokeInst>(instr)) return false;
+
+      // Make sure the instruction is a call or invoke.
+      CallSite cs(const_cast<Instruction *>(instr));
+      if (!cs) return false;
       
       // Make sure that the value is only the target of this call and
       // not an argument.
-      for (unsigned i=1,e=instr->getNumOperands(); i!=e; ++i)
-        if (instr->getOperand(i)==v)
-          return false;
+      if (cs.hasArgument(v))
+        return false;
     } else if (const llvm::ConstantExpr *ce = 
                dyn_cast<llvm::ConstantExpr>(*it)) {
       if (ce->getOpcode()==Instruction::BitCast)
