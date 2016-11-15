@@ -114,12 +114,11 @@ bool StagedSolverImpl::computeValidity(const Query& query,
 }
 
 bool StagedSolverImpl::computeValue(const Query& query,
-                                    ref<Expr> &result,
-                                    const Query& full_query) {
-  if (primary->computeValue(query, result, full_query))
+                                    ref<Expr> &result) {
+  if (primary->computeValue(query, result))
     return true;
 
-  return secondary->impl->computeValue(query, result, full_query);
+  return secondary->impl->computeValue(query, result);
 }
 
 bool 
@@ -147,4 +146,3 @@ char *StagedSolverImpl::getConstraintLog(const Query& query) {
 void StagedSolverImpl::setCoreSolverTimeout(double timeout) {
   secondary->impl->setCoreSolverTimeout(timeout);
 }
-

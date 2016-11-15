@@ -86,7 +86,7 @@ bool Solver::getValue(const Query& query, ref<ConstantExpr> &result) {
 
   // FIXME: Push ConstantExpr requirement down.
   ref<Expr> tmp;
-  if (!impl->computeValue(query, tmp, query))
+  if (!impl->computeValue(query, tmp))
     return false;
   
   result = cast<ConstantExpr>(tmp);

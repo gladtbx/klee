@@ -928,7 +928,7 @@ void SpecialFunctionHandler::handleOpen(ExecutionState &state,
 			klee_warning("Fopen Parameter Size Wrong");
 			executor.terminateStateOnError(state,
 			                                 "fopen parameter size wrong",
-			                                 "fopen.err");
+			                                 Executor::User);
 		}
 		Executor::ExactResolutionList rl;
 		std::string name = readStringAtAddress(state,arguments[0]);
@@ -2024,8 +2024,8 @@ void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
 				} else {
 					executor.terminateStateOnError(*unbound,
 							"memory error: out of bound pointer",
-							"ptr.err",
-							executor.getAddressInfo(*unbound, address));
+							Executor::Ptr
+							);
 				}
 			}
 		}
