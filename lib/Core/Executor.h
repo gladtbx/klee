@@ -401,7 +401,7 @@ private:
 //		  klee_warning("Gladtbx: Null pointer in ifTargetFunction encounter");
 		  return false;
 	  }
-	  std::string functionName=f->getNameStr();
+	  std::string functionName=f->getName();
 	  std::vector<std::string> targetFunctions = interpreterHandler->getTargetFunction();
 	  for(std::vector<std::string>::iterator it= targetFunctions.begin(), ie = targetFunctions.end(); it != ie; it++){
 		  if(functionName == *it)

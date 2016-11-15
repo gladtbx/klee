@@ -25,7 +25,7 @@
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 3)
 #include "llvm/IR/Module.h"
 #else
-#include "llvm/Module.h"
+#include "llvm/IR/Module.h"
 #endif
 #include "llvm/ADT/Twine.h"
 
@@ -879,9 +879,8 @@ void SpecialFunctionHandler::handleOpen(ExecutionState &state,
 
 		LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 		if (!resultType->isVoidTy()) {
-			TargetData *TD = new TargetData(executor.kmodule->module);
 			uint64_t v = id;
-			unsigned width = TD->getTypeAllocSizeInBits(resultType);
+			unsigned width = resultType->getPrimitiveSizeInBits();
 			ref<Expr> e = ConstantExpr::alloc(v,width);
 			executor.bindLocal(target, state, e);
 		 }
@@ -1055,8 +1054,7 @@ void SpecialFunctionHandler::processScan(ExecutionState *current_state,Expr::Wid
 				//set the return value to be arguments read. Do not process any more.
 				LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 				if (!resultType->isVoidTy()) {
-					TargetData *TD = new TargetData(executor.kmodule->module);
-					unsigned width = TD->getTypeAllocSizeInBits(resultType);
+					unsigned width = resultType->getPrimitiveSizeInBits();
 					ref<Expr> e;
 					if(branches.second->getBytesRead() == 0)
 						e = ConstantExpr::alloc(EOF,width);
@@ -1082,8 +1080,7 @@ void SpecialFunctionHandler::processScan(ExecutionState *current_state,Expr::Wid
 				//return EOF
 				LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 				if (!resultType->isVoidTy()) {
-					TargetData *TD = new TargetData(executor.kmodule->module);
-					unsigned width = TD->getTypeAllocSizeInBits(resultType);
+					unsigned width = resultType->getPrimitiveSizeInBits();
 					ref<Expr> e;
 					if(branches.first->getBytesRead() == 0)
 						e = ConstantExpr::alloc(EOF,width);
@@ -1136,8 +1133,7 @@ void SpecialFunctionHandler::processScanHex(ExecutionState *current_state,Expr::
 			//return EOF as there is no more to read
 			LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 			if (!resultType->isVoidTy()) {
-				TargetData *TD = new TargetData(executor.kmodule->module);
-				unsigned width = TD->getTypeAllocSizeInBits(resultType);
+				unsigned width = resultType->getPrimitiveSizeInBits();
 				ref<Expr> e;
 				e = ConstantExpr::alloc(zeroBranch.first->getBytesRead(),width);
 				executor.bindLocal(target, *zeroBranch.first, e);
@@ -1160,8 +1156,7 @@ void SpecialFunctionHandler::processScanHex(ExecutionState *current_state,Expr::
 					//return EOF
 					LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 					if (!resultType->isVoidTy()) {
-						TargetData *TD = new TargetData(executor.kmodule->module);
-						unsigned width = TD->getTypeAllocSizeInBits(resultType);
+						unsigned width = resultType->getPrimitiveSizeInBits();
 						ref<Expr> e;
 						if(xBranch.first->getBytesRead() == 0)
 							e = ConstantExpr::alloc(EOF,width);
@@ -1273,8 +1268,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 								//return EOF
 						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 						if (!resultType->isVoidTy()) {
-							TargetData *TD = new TargetData(executor.kmodule->module);
-							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							unsigned width = resultType->getPrimitiveSizeInBits();
 							ref<Expr> e;
 							if((*s)->getBytesRead() == 0)
 								e = ConstantExpr::alloc(EOF,width);
@@ -1314,8 +1308,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 									//return EOF
 									LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 									if (!resultType->isVoidTy()) {
-										TargetData *TD = new TargetData(executor.kmodule->module);
-										unsigned width = TD->getTypeAllocSizeInBits(resultType);
+										unsigned width = resultType->getPrimitiveSizeInBits();
 										ref<Expr> e;
 										if((*s)->getBytesRead() == 0)
 											e = ConstantExpr::alloc(EOF,width);
@@ -1337,8 +1330,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 							//set return to bytesread
 							LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 							if (!resultType->isVoidTy()) {
-								TargetData *TD = new TargetData(executor.kmodule->module);
-								unsigned width = TD->getTypeAllocSizeInBits(resultType);
+								unsigned width = resultType->getPrimitiveSizeInBits();
 								ref<Expr> e;
 								if((*s)->getBytesRead() == 0)
 									e = ConstantExpr::alloc(EOF,width);
@@ -1408,8 +1400,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 									//return EOF
 									LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 									if (!resultType->isVoidTy()) {
-										TargetData *TD = new TargetData(executor.kmodule->module);
-										unsigned width = TD->getTypeAllocSizeInBits(resultType);
+										unsigned width = resultType->getPrimitiveSizeInBits();
 										ref<Expr> e;
 										if((signbranches.first)->getBytesRead() == 0)
 											e = ConstantExpr::alloc(EOF,width);
@@ -1453,8 +1444,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 									//return EOF
 									LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 									if (!resultType->isVoidTy()) {
-										TargetData *TD = new TargetData(executor.kmodule->module);
-										unsigned width = TD->getTypeAllocSizeInBits(resultType);
+										unsigned width = resultType->getPrimitiveSizeInBits();
 										ref<Expr> e;
 										if(signbranches.first->getBytesRead() == 0)
 											e = ConstantExpr::alloc(EOF,width);
@@ -1482,8 +1472,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 							//if not a correct specifier, return numbytes read;
 							LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 							if (!resultType->isVoidTy()) {
-								TargetData *TD = new TargetData(executor.kmodule->module);
-								unsigned width = TD->getTypeAllocSizeInBits(resultType);
+								unsigned width = resultType->getPrimitiveSizeInBits();
 								ref<Expr> e;
 								if((*s)->getBytesRead() == 0)
 									e = ConstantExpr::alloc(EOF,width);
@@ -1521,8 +1510,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 										//return EOF
 										LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 										if (!resultType->isVoidTy()) {
-											TargetData *TD = new TargetData(executor.kmodule->module);
-											unsigned width = TD->getTypeAllocSizeInBits(resultType);
+											unsigned width = resultType->getPrimitiveSizeInBits();
 											ref<Expr> e;
 											if((*s)->getBytesRead() == 0)
 												e = ConstantExpr::alloc(EOF,width);
@@ -1555,8 +1543,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 							//return num of chars read.
 							LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 							if (!resultType->isVoidTy()) {
-								TargetData *TD = new TargetData(executor.kmodule->module);
-								unsigned width = TD->getTypeAllocSizeInBits(resultType);
+								unsigned width = resultType->getPrimitiveSizeInBits();
 								ref<Expr> e;
 								if((*s)->getBytesRead() == 0)
 									e = ConstantExpr::alloc(EOF,width);
@@ -1587,8 +1574,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 			for(std::vector<ExecutionState*>::iterator s= stateNotProcessed.begin(); s != stateNotProcessed.end();s++){
 				LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 				if (!resultType->isVoidTy()) {
-					TargetData *TD = new TargetData(executor.kmodule->module);
-					unsigned width = TD->getTypeAllocSizeInBits(resultType);
+					unsigned width = resultType->getPrimitiveSizeInBits();
 					ref<Expr> e;
 					if((*s)->getBytesRead() == 0)
 						e = ConstantExpr::alloc(EOF,width);
@@ -1705,8 +1691,7 @@ void SpecialFunctionHandler::handleFprintf(ExecutionState &state,
 	}
 	LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 	if (!resultType->isVoidTy()) {
-		TargetData *TD = new TargetData(executor.kmodule->module);
-		unsigned width = TD->getTypeAllocSizeInBits(resultType);
+		unsigned width = resultType->getPrimitiveSizeInBits();
 		ref<Expr> e;
 		e = ConstantExpr::alloc(byteswrite,width);
 		executor.bindLocal(target, state, e);
@@ -1781,8 +1766,7 @@ void SpecialFunctionHandler::handleFread(ExecutionState &state,
 					if(descriptor->getoffset() >= desc_size){//eof reached, number of bytes read returned;
 						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 						if (!resultType->isVoidTy()) {
-							TargetData *TD = new TargetData(executor.kmodule->module);
-							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							unsigned width = resultType->getPrimitiveSizeInBits();
 							ref<Expr> e;
 							e = ConstantExpr::alloc(bytesRead,width);
 							executor.bindLocal(target, state, e);
@@ -1799,8 +1783,7 @@ void SpecialFunctionHandler::handleFread(ExecutionState &state,
 					if(descriptor->getoffset()+1>=desc_size){
 						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 						if (!resultType->isVoidTy()) {
-							TargetData *TD = new TargetData(executor.kmodule->module);
-							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							unsigned width = resultType->getPrimitiveSizeInBits();
 							ref<Expr> e;
 							e = ConstantExpr::alloc(bytesRead,width);
 							executor.bindLocal(target, state, e);
@@ -1818,8 +1801,7 @@ void SpecialFunctionHandler::handleFread(ExecutionState &state,
 					if(descriptor->getoffset()+1>=desc_size){
 						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 						if (!resultType->isVoidTy()) {
-							TargetData *TD = new TargetData(executor.kmodule->module);
-							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							unsigned width = resultType->getPrimitiveSizeInBits();
 							ref<Expr> e;
 							e = ConstantExpr::alloc(bytesRead,width);
 							executor.bindLocal(target, state, e);
@@ -1839,8 +1821,7 @@ void SpecialFunctionHandler::handleFread(ExecutionState &state,
 					if(descriptor->getoffset()+7>=desc_size){
 						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 						if (!resultType->isVoidTy()) {
-							TargetData *TD = new TargetData(executor.kmodule->module);
-							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							unsigned width = resultType->getPrimitiveSizeInBits();
 							ref<Expr> e;
 							e = ConstantExpr::alloc(bytesRead,width);
 							executor.bindLocal(target, state, e);
@@ -1864,8 +1845,7 @@ void SpecialFunctionHandler::handleFread(ExecutionState &state,
 					if(descriptor->getoffset()+size-1>=desc_size){
 						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 						if (!resultType->isVoidTy()) {
-							TargetData *TD = new TargetData(executor.kmodule->module);
-							unsigned width = TD->getTypeAllocSizeInBits(resultType);
+							unsigned width = resultType->getPrimitiveSizeInBits();
 							ref<Expr> e;
 							e = ConstantExpr::alloc(bytesRead,width);
 							executor.bindLocal(target, state, e);
@@ -1995,8 +1975,7 @@ void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
 				if(descriptor->getoffset() >= desc_size){//eof reached, number of bytes read returned;
 					LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
 					if (!resultType->isVoidTy()) {
-						TargetData *TD = new TargetData(executor.kmodule->module);
-						unsigned width = TD->getTypeAllocSizeInBits(resultType);
+						unsigned width = resultType->getPrimitiveSizeInBits();
 						ref<Expr> e;
 						e = ConstantExpr::alloc(bytesWritten,width);
 						executor.bindLocal(target, *(opit->second), e);
