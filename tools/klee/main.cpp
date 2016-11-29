@@ -803,6 +803,7 @@ static const char *modelledExternals[] = {
   "klee_mark_global",
   "klee_merge",
   "klee_prefer_cex",
+  "klee_posix_prefer_cex",
   "klee_print_expr",
   "klee_print_range",
   "klee_report_error",
