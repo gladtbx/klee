@@ -409,6 +409,33 @@ llvm::raw_fd_ostream *KleeHandler::openTestFile(const std::string &suffix,
   return openOutputFile(getTestFilename(suffix, id));
 }
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &o, const PathLocation &I)
+ {
+   o << I.branch << " " << I.file.size() << " " << I.file << " " << I.line;
+   return o;
+ }
+
+ std::istream &operator>>(std::istream &i, PathLocation &I)
+ {
+   unsigned branch, count;
+
+   // >> to char is different -- use a temporary unsigned
+   i >> branch;
+   I.branch = branch;
+   i >> count;
+   i.get();
+
+   char *buf = new char[count];
+   i.read(buf, count);
+   I.file = std::string(buf, count);
+   delete[] buf;
+
+   i.get();
+   i >> I.line;
+
+   return i;
+ }
+
 
 /* Outputs all files (.ktest, .kquery, .cov etc.) describing a test case */
 void KleeHandler::processTestCase(const ExecutionState &state,
@@ -420,10 +447,10 @@ void KleeHandler::processTestCase(const ExecutionState &state,
   }
 
   if(OnlyKtestForTarget){
-	  if(!state.targetFunc){
+	  /*if(!state.targetFunc()){
 		  klee_warning("Test case not covering interested function, dropping");
 		  return;
-	  }
+	  }*/
   }
 
   if (!NoOutput) {
