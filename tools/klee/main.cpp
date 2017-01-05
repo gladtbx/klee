@@ -107,8 +107,8 @@ namespace {
             cl::desc("Write .cvc files for each test case"));
 
   cl::opt<bool>
-  WritePCs("write-pcs",
-            cl::desc("Write .pc files for each test case"));
+  WriteKQueries("write-kqueries",
+            cl::desc("Write .kquery files for each test case"));
 
   cl::opt<bool>
   WriteSMT2s("write-smt2s",
@@ -464,7 +464,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &o, const PathLocation &I)
  }
 
 
-/* Outputs all files (.ktest, .pc, .cov etc.) describing a test case */
+/* Outputs all files (.ktest, .kquery, .cov etc.) describing a test case */
 void KleeHandler::processTestCase(const ExecutionState &state,
                                   const char *errorMessage,
                                   const char *errorSuffix) {
@@ -537,10 +537,10 @@ void KleeHandler::processTestCase(const ExecutionState &state,
       delete f;
     }
 
-    if (errorMessage || WritePCs) {
+    if (errorMessage || WriteKQueries) {
       std::string constraints;
       m_interpreter->getConstraintLog(state, constraints,Interpreter::KQUERY);
-      llvm::raw_ostream *f = openTestFile("pc", id);
+      llvm::raw_ostream *f = openTestFile("kquery", id);
       *f << constraints;
       delete f;
     }
@@ -830,6 +830,7 @@ static const char *modelledExternals[] = {
   "klee_mark_global",
   "klee_merge",
   "klee_prefer_cex",
+  "klee_posix_prefer_cex",
   "klee_print_expr",
   "klee_print_range",
   "klee_report_error",

@@ -7,12 +7,13 @@
 #
 #===------------------------------------------------------------------------===#
 add_executable(kleaver
-	main.cpp
+  main.cpp
 )
 
-klee_get_llvm_libs(LLVM_LIBS support)
-set(KLEE_LIBS kleeBasic kleaverSolver kleaverExpr kleeSupport)
+set(KLEE_LIBS
+  kleaverSolver
+)
 
-target_link_libraries(kleaver ${KLEE_LIBS} ${LLVM_LIBS})
+target_link_libraries(kleaver ${KLEE_LIBS})
 
 install(TARGETS kleaver RUNTIME DESTINATION bin)

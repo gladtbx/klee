@@ -119,12 +119,7 @@ namespace {
   DumpStatesOnHalt("dump-states-on-halt",
                    cl::init(true),
 		   cl::desc("Dump test cases for all active states on exit (default=on)"));
- 
-  cl::opt<bool>
-  RandomizeFork("randomize-fork",
-                cl::init(false),
-		cl::desc("Randomly swap the true and false states on a fork (default=off)"));
- 
+  
   cl::opt<bool>
   AllowExternalSymCalls("allow-external-sym-calls",
                         cl::init(false),
@@ -358,12 +353,13 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
   if (!coreSolver) {
     klee_error("Failed to create core solver\n");
   }
+
   Solver *solver = constructSolverChain(
       coreSolver,
       interpreterHandler->getOutputFilename(ALL_QUERIES_SMT2_FILE_NAME),
       interpreterHandler->getOutputFilename(SOLVER_QUERIES_SMT2_FILE_NAME),
-      interpreterHandler->getOutputFilename(ALL_QUERIES_PC_FILE_NAME),
-      interpreterHandler->getOutputFilename(SOLVER_QUERIES_PC_FILE_NAME));
+      interpreterHandler->getOutputFilename(ALL_QUERIES_KQUERY_FILE_NAME),
+      interpreterHandler->getOutputFilename(SOLVER_QUERIES_KQUERY_FILE_NAME));
 
   this->solver = new TimingSolver(solver, EqualitySubstitution);
   memory = new MemoryManager(&arrayCache);
@@ -380,7 +376,7 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
 
 #if LLVM_VERSION_CODE >= LLVM_VERSION(3, 5)
     debugInstFile = new llvm::raw_fd_ostream(debug_file_name.c_str(), ErrorInfo,
-                                             llvm::sys::fs::OpenFlags::F_Text),
+                                             llvm::sys::fs::OpenFlags::F_Text);
 #else
     debugInstFile =
         new llvm::raw_fd_ostream(debug_file_name.c_str(), ErrorInfo);
@@ -951,9 +947,6 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
 
     falseState = trueState->branch();
     addedStates.push_back(falseState);
-
-    if (RandomizeFork && theRNG.getBool())
-      std::swap(trueState, falseState);
 
     if (it != seedMap.end()) {
       std::vector<SeedInfo> seeds = it->second;

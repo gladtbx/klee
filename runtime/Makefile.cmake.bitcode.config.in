@@ -39,9 +39,10 @@ USE_MODULE_INSTEAD_OF_BCA := @USE_RUNTIME_BINARY_TYPE_HACK@
 # Commands
 MKDIR := mkdir
 RM := rm
+CMP := cmp
 
 # Compiler flags
-LLVMCC.Flags += \
+LLVMCC.Flags += $(LLVMCC.ExtraFlags) \
 	-I@CMAKE_SOURCE_DIR@/include \
 	-I@CMAKE_BINARY_DIR@/include \
 	-emit-llvm \

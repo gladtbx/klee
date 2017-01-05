@@ -41,7 +41,7 @@ project(KLEE CXX C)
 # Project version
 ###############################################################################
 set(KLEE_VERSION_MAJOR 1)
-set(KLEE_VERSION_MINOR 2)
+set(KLEE_VERSION_MINOR 3)
 set(KLEE_VERSION_PATCH 0)
 set(KLEE_VERSION_TWEAK 0)
 set(KLEE_VERSION "${KLEE_VERSION_MAJOR}.${KLEE_VERSION_MINOR}.${KLEE_VERSION_PATCH}.${KLEE_VERSION_TWEAK}")
@@ -67,6 +67,39 @@ if ("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
   message(FATAL_ERROR "In source builds are not allowed. You should invoke "
           "CMake from a different directory.")
 endif()
+
+################################################################################
+# Sanity Check: Check for in source build of the old build system.
+# Some build files from the old build system could interfere with our build.
+################################################################################
+set(KLEE_OLD_BUILD_SYSTEM_FILES
+  "include/klee/Config/config.h"
+  "test/lit.site.cfg"
+)
+foreach (legacy_file ${KLEE_OLD_BUILD_SYSTEM_FILES})
+  if (EXISTS "${CMAKE_SOURCE_DIR}/${legacy_file}")
+    if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
+      set(CLEAN_SRC_DIR_INSTRUCTIONS
+        "The KLEE source tree apears to be a git repository so you can run"
+        " \"git clean -dxn\" to see what files aren't part of the repo and then"
+        " run \"git clean -fdx\" to remove them."
+      )
+    else()
+      # This is the only reliable way to fix this.
+      set(CLEAN_SRC_DIR_INSTRUCTIONS
+        "The KLEE source tree doesn't appear to be a git repository so you will"
+        " need to download a fresh copy of KLEE's source code."
+      )
+    endif()
+    message(FATAL_ERROR "\"${CMAKE_SOURCE_DIR}/${legacy_file}\""
+      " exists in KLEE's source tree. It is likely that the Autoconf/Makefile"
+      " build system was configured to do an in-source build in KLEE's source"
+      " tree. This could cause problems with the CMake build. "
+      ${CLEAN_SRC_DIR_INSTRUCTIONS}
+      " You can then run cmake again."
+    )
+  endif()
+endforeach()
 
 ################################################################################
 # Build type
@@ -161,6 +194,7 @@ set(NEEDED_LLVM_VARS
   LLVM_INCLUDE_DIRS
   LLVM_LIBRARY_DIRS
   LLVM_TOOLS_BINARY_DIR
+  LLVM_ENABLE_VISIBILITY_INLINES_HIDDEN
   TARGET_TRIPLE
 )
 
@@ -176,6 +210,10 @@ if (LLVM_ENABLE_ASSERTIONS)
   set(ENABLE_KLEE_DEBUG 1) # for config.h
 else()
   unset(ENABLE_KLEE_DEBUG) # for config.h
+endif()
+
+if (LLVM_ENABLE_VISIBILITY_INLINES_HIDDEN)
+  list(APPEND KLEE_COMPONENT_CXX_FLAGS "-fvisibility-inlines-hidden")
 endif()
 
 
@@ -399,6 +437,8 @@ if (ENABLE_TCMALLOC)
     message(FATAL_ERROR "Can't find \"${TCMALLOC_HEADER}\"")
   endif()
 else()
+  unset(HAVE_GPERFTOOLS_MALLOC_EXTENSION_H)
+  unset(HAVE_GPERFTOOLS_MALLOC_EXTENSION_H CACHE)
   message(STATUS "TCMalloc support disabled")
 endif()
 
@@ -545,12 +585,12 @@ if (ENABLE_KLEE_UCLIBC)
   # Find the C library bitcode archive
   set(KLEE_UCLIBC_BCA_NAME "klee-uclibc.bca")
   set(KLEE_UCLIBC_C_BCA "${KLEE_UCLIBC_PATH}/lib/libc.a")
-  if (NOT EXISTS "${KLEE_UCLIBC_PATH}")
+  if (NOT EXISTS "${KLEE_UCLIBC_C_BCA}")
     message(FATAL_ERROR
       "klee-uclibc library not found at \"${KLEE_UCLIBC_C_BCA}\"")
   endif()
   message(STATUS "Found klee-uclibc library: \"${KLEE_UCLIBC_C_BCA}\"")
-  
+
   # Make a symlink to KLEE_UCLIBC_C_BCA so KLEE can find it where it
   # is expected.
   file(MAKE_DIRECTORY "${KLEE_RUNTIME_DIRECTORY}")
@@ -558,16 +598,16 @@ if (ENABLE_KLEE_UCLIBC)
     "${KLEE_UCLIBC_C_BCA}"
     "${KLEE_RUNTIME_DIRECTORY}/${KLEE_UCLIBC_BCA_NAME}"
   )
-list(APPEND KLEE_COMPONENT_CXX_DEFINES
-  -DKLEE_UCLIBC_BCA_NAME=\"${KLEE_UCLIBC_BCA_NAME}\")
+  list(APPEND KLEE_COMPONENT_CXX_DEFINES
+    -DKLEE_UCLIBC_BCA_NAME=\"${KLEE_UCLIBC_BCA_NAME}\")
 
-# Add klee-uclibc to the install target. We install the original
-# file rather than the symlink because CMake would just copy the symlink
-# rather than the file.
-install(FILES "${KLEE_UCLIBC_C_BCA}"
-  DESTINATION "${KLEE_INSTALL_RUNTIME_DIR}"
-  RENAME "${KLEE_UCLIBC_BCA_NAME}"
-  )
+  # Add klee-uclibc to the install target. We install the original
+  # file rather than the symlink because CMake would just copy the symlink
+  # rather than the file.
+  install(FILES "${KLEE_UCLIBC_C_BCA}"
+    DESTINATION "${KLEE_INSTALL_RUNTIME_DIR}"
+    RENAME "${KLEE_UCLIBC_BCA_NAME}"
+    )
 
 else()
   message(STATUS "klee-uclibc support disabled")
@@ -591,11 +631,8 @@ if (EXISTS "${CMAKE_SOURCE_DIR}/.git")
   include(${CMAKE_SOURCE_DIR}/cmake/GetGitRevisionDescription.cmake)
   get_git_head_revision(_NOT_USED_KLEE_GIT_REFSPEC KLEE_GIT_SHA1HASH)
   message(STATUS "KLEE_GIT_SHA1HASH: ${KLEE_GIT_SHA1HASH}")
-  git_describe(KLEE_GIT_TAG "--tags")
-  message(STATUS "KLEE_GIT_TAG: ${KLEE_GIT_TAG}")
 else()
   set(KLEE_GIT_SHA1HASH "unknown")
-  set(KLEE_GIT_TAG "unknown")
 endif()
 set(AUTO_GEN_MSG "AUTOMATICALLY GENERATED. DO NOT EDIT!")
 configure_file(${CMAKE_SOURCE_DIR}/include/klee/Config/CompileTimeInfo.h.cmin
@@ -605,8 +642,8 @@ configure_file(${CMAKE_SOURCE_DIR}/include/klee/Config/CompileTimeInfo.h.cmin
 ################################################################################
 # Global include directories
 ################################################################################
-include_directories("${CMAKE_SOURCE_DIR}/include")
 include_directories("${CMAKE_BINARY_DIR}/include")
+include_directories("${CMAKE_SOURCE_DIR}/include")
 
 ################################################################################
 # Set default location for targets in the build directory
