@@ -17,7 +17,6 @@ set(LLVM_COMPONENTS
 	bitwriter
 	engine
 	ipo
-	jit
 	linker
 	support
 )

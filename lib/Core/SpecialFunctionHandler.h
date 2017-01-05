@@ -12,7 +12,6 @@
 
 #include "llvm/IR/Type.h"
 //#include "llvm/Target/TargetData.h"
-#include "llvm/Support/CommandLine.h"
 #include "AddressSpace.h"
 #include <iterator>
 #include <map>
@@ -24,6 +23,7 @@ namespace llvm {
 }
 
 namespace klee {
+
   class Executor;
   class Expr;
   class ExecutionState;

@@ -182,9 +182,9 @@ namespace {
 		       cl::init(true),
 		       cl::desc("Simplify equality expressions before querying the solver (default=on)."));
 
-  cl::opt<unsigned>
+  llvm::cl::opt<unsigned>
   MaxSymArraySize("max-sym-array-size",
-                  cl::init(0));
+                  llvm::cl::init(0));
 
   cl::opt<bool>
   SuppressExternalWarnings("suppress-external-warnings",
@@ -764,6 +764,28 @@ void Executor::branch(ExecutionState &state,
     if (result[i])
       addConstraint(*result[i], conditions[i]);
 }
+
+std::string Executor::getPathInfo(const ExecutionState &state, bool trueBranch)
+ {
+   const llvm::BranchInst *branch =
+           dyn_cast<llvm::BranchInst>(state.prevPC->inst);
+   const llvm::Instruction *succ =
+           branch->getSuccessor(trueBranch ? 0 : 1)->getFirstNonPHI();
+
+   const InstructionInfo &ii = kmodule->infos->getInfo(succ);
+   const std::string &file = ii.file;
+   unsigned int fsize = file.size();
+   unsigned int line = ii.line;
+   std::stringstream ss;
+
+   ss << (trueBranch ? '1' : '0');
+
+   ss.write(reinterpret_cast<char*>(&fsize), sizeof(unsigned int));
+   ss << file;
+   ss.write(reinterpret_cast<char*>(&line), sizeof(unsigned int));
+
+   return ss.str();
+ }
 /*
  * Gladtbx:First evaluate the condition.
  * Then if concrete true or false, we don't fork

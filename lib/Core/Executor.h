@@ -451,6 +451,8 @@ private:
   void printDebugInstructions(ExecutionState &state);
   void doDumpStates();
 
+  std::string getPathInfo(const ExecutionState &state, bool trueBranch);
+
 
 public:
   Executor(const InterpreterOptions &opts, InterpreterHandler *ie);
