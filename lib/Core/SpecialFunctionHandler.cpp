@@ -56,6 +56,7 @@ namespace {
                    cl::desc("Silently terminate paths with an infeasible "
                             "condition given to klee_assume() rather than "
                             "emitting an error (default=false)"));
+
 }
 
 
@@ -66,9 +67,7 @@ namespace {
 cl::opt<bool>
 symbolicFileIO("symbolicFileIO",cl::desc("Make File I/O symbolic, including Fopen,Fscanf,Fprintf,Fputs"),cl::init(false));
 
-cl::opt<unsigned>
-  MaxSymArraySize("max-sym-array-size",
-                  cl::init(0));
+
 // FIXME: We are more or less committed to requiring an intrinsic
 // library these days. We can move some of this stuff there,
 // especially things like realloc which have complicated semantics
@@ -197,82 +196,79 @@ void SpecialFunctionHandler::prepare() {
 
   for (unsigned i=0; i<N; ++i) {
     HandlerInfo &hi = handlerInfo[i];
-    if(hi.name == "fopen"){
+    if(strcmp(hi.name,"fopen") == 0 ){
     	  if(!symbolicFileIO){
     		  handlerInfo[i] = {"",NULL,false,false,false};
     		  continue;
     	  }
     }
-    if(hi.name == "fscanf"){
+    if(strcmp(hi.name,"fscanf") == 0 ){
   	  if(!symbolicFileIO){
   		  handlerInfo[i] = {"",NULL,false,false,false};
   		  continue;
   	  }
     }
-    if(hi.name == "\01__isoc99_fscanf"){
+    if(strcmp(hi.name,"\01__isoc99_fscanf") == 0 ){
 	  if(!symbolicFileIO){
 		  handlerInfo[i] = {"",NULL,false,false,false};
 		  continue;
 	  }
     }
-    if(hi.name == "\01__isoc99_sscanf"){
+    if(strcmp(hi.name,"\01__isoc99_sscanf") == 0 ){
 	  if(!symbolicFileIO){
 		  handlerInfo[i] = {"",NULL,false,false,false};
 		  continue;
 	  }
     }
-    if(hi.name == "__isoc99_fscanf"){
+    if(strcmp(hi.name,"__isoc99_fscanf") == 0 ){
   	  if(!symbolicFileIO){
   		  handlerInfo[i] = {"",NULL,false,false,false};
   		  continue;
   	  }
     }
-    if(hi.name == "__isoc99_sscanf"){
+    if(strcmp(hi.name,"__isoc99_sscanf") == 0 ){
   	  if(!symbolicFileIO){
   		  handlerInfo[i] = {"",NULL,false,false,false};
   		  continue;
   	  }
     }
-    if(hi.name == "fputc"){
+    if(strcmp(hi.name,"fputc") == 0 ){
    	  if(!symbolicFileIO){
    		  handlerInfo[i] = {"",NULL,false,false,false};
    		  continue;
    	  }
      }
-    if(hi.name == "fprintf"){
+    if(strcmp(hi.name,"fprintf") == 0 ){
 	  if(!symbolicFileIO){
 		  handlerInfo[i] = {"",NULL,false,false,false};
 		  continue;
 	  }
     }
-    if(hi.name == "printf"){
+    if(strcmp(hi.name,"printf") == 0 ){
 	  if(!symbolicFileIO){
 		  handlerInfo[i] = {"",NULL,false,false,false};
 		  continue;
 	  }
     }
-    if(hi.name == "fclose"){
+    if(strcmp(hi.name,"fclose") == 0 ){
 	  if(!symbolicFileIO){
 		  handlerInfo[i] = {"",NULL,false,false,false};
 		  continue;
 	  }
     }
-
-    if(hi.name == "fread"){
+    if(strcmp(hi.name,"fread") == 0 ){
     	if(!symbolicFileIO){
   		  handlerInfo[i] = {"",NULL,false,false,false};
   		  continue;
     	}
     }
-
-    if(hi.name == "fwrite"){
+    if(strcmp(hi.name,"fwrite") == 0 ){
     	if(!symbolicFileIO){
   		  handlerInfo[i] = {"",NULL,false,false,false};
   		  continue;
     	}
     }
-
-    if(hi.name == "sscanf"){
+    if(strcmp(hi.name,"sscanf") == 0 ){
        	if(!symbolicFileIO){
    		  handlerInfo[i] = {"",NULL,false,false,false};
    		  continue;
@@ -1388,14 +1384,14 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 
 						if(nextit == format.end()){
 							//warning.Gladtbx:Maybe should be error?!
-							klee_warning("Nothing behind % sign!");
+							klee_warning("Nothing behind %% sign!");
 							continue;
 						}
 						while(*nextit == '0' ||*nextit == '1' ||*nextit == '2' ||*nextit == '3' ||*nextit == '4' ||*nextit == '5' ||*nextit == '6' ||*nextit == '7' ||*nextit == '8' ||*nextit == '9'){
 							nextit++;//Fixme:Add support for numbers here;Gladtbx
 							if(nextit == format.end()){
 								//warning.Gladtbx:Maybe should be error?!
-								klee_warning("Nothing behind % sign!");
+								klee_warning("Nothing behind %% sign!");
 								continue;
 							}
 						}
@@ -1672,7 +1668,7 @@ void SpecialFunctionHandler::handleFprintf(ExecutionState &state,
 		else{
 			it++;
 			if(it == format.end()){
-				klee_warning("Missing indicator after \% sign in fprintf!");
+				klee_warning("Missing indicator after %% sign in fprintf!");
 				ref<Expr> writtenLoc = AddExpr::create(bufferLocation,ConstantExpr::create(descriptor->getoffset(),bufferLocation->getWidth()));
 				ref<Expr> writtenChar = ConstantExpr::create('%',ConstantExpr::Int8);
 				executor.executeMemoryOperation(state,true,writtenLoc,writtenChar,0);
@@ -1934,9 +1930,9 @@ void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
 		if (success) {
 			const MemoryObject *mo = op.first;
 
-			if (MaxSymArraySize && mo->size>=MaxSymArraySize) {
-				address = executor.toConstant(state, address, "max-sym-array-size");
-			}
+//			if (MaxSymArraySize && mo->size>=MaxSymArraySize) {
+//				address = executor.toConstant(state, address, "max-sym-array-size");
+//			}
 
 			ref<Expr> offset = mo->getOffsetExpr(address);
 
