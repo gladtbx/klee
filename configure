@@ -3956,38 +3956,38 @@ function klee_check_bc()
 {
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking ${3} LLVM Bitcode compiler works" >&5
 $as_echo_n "checking ${3} LLVM Bitcode compiler works... " >&6; }
-        klee_bc_test_file="./.klee_llvm_bitcode_test.${2}"
+#        klee_bc_test_file="./.klee_llvm_bitcode_test.${2}"
 
-    echo "int main() { return 0;}" > "${klee_bc_test_file}"
-    "${1}" -emit-llvm -c "${klee_bc_test_file}" -o "${klee_bc_test_file}.bc"
-    if test $? -ne 0 ; then
-        as_fn_error $? "Failed running ${3} LLVM Bitcode compiler" "$LINENO" 5
-    fi
+#    echo "int main() { return 0;}" > "${klee_bc_test_file}"
+#    "${1}" -emit-llvm -c "${klee_bc_test_file}" -o "${klee_bc_test_file}.bc"
+#    if test $? -ne 0 ; then
+#        as_fn_error $? "Failed running ${3} LLVM Bitcode compiler" "$LINENO" 5
+#    fi
 
-    if test \! -e "${klee_bc_test_file}.bc"; then
-        as_fn_error $? " ${3} LLVM Bitcode compiler did not produce any output" "$LINENO" 5
-    fi
+#    if test \! -e "${klee_bc_test_file}.bc"; then
+#        as_fn_error $? " ${3} LLVM Bitcode compiler did not produce any output" "$LINENO" 5
+#    fi
 
-                if test -x "$llvm_obj/$llvm_build_mode/bin/llvm-dis" ; then
-        "$llvm_obj/$llvm_build_mode/bin/llvm-dis" -o "${klee_bc_test_file}.ll" "${klee_bc_test_file}.bc"
+#                if test -x "$llvm_obj/$llvm_build_mode/bin/llvm-dis" ; then
+#        "$llvm_obj/$llvm_build_mode/bin/llvm-dis" -o "${klee_bc_test_file}.ll" "${klee_bc_test_file}.bc"
 
-        if test $? -ne 0; then
-            as_fn_error $? "Failed converting LLVM Bitcode to LLVM assembly. Maybe your LLVM versions do not match?" "$LINENO" 5
-        fi
+        #if test $? -ne 0; then
+        #    as_fn_error $? "Failed converting LLVM Bitcode to LLVM assembly. Maybe your LLVM versions do not match?" "$LINENO" 5
+        #fi
 
-        if test -e "${klee_bc_test_file}.ll" ; then
-            { $as_echo "$as_me:${as_lineno-$LINENO}: result: Success" >&5
-$as_echo "Success" >&6; }
-            rm "${klee_bc_test_file}" "${klee_bc_test_file}.bc" "${klee_bc_test_file}.ll"
-        else
-            rm "${klee_bc_test_file}" "${klee_bc_test_file}.bc" "${klee_bc_test_file}.ll"
-            as_fn_error $? "Failed converting LLVM Bitcode to LLVM assembly. Maybe your LLVM versions do not match?" "$LINENO" 5
-        fi
+        #if test -e "${klee_bc_test_file}.ll" ; then
+        #    { $as_echo "$as_me:${as_lineno-$LINENO}: result: Success" >&5
+#$as_echo "Success" >&6; }
+        #    rm "${klee_bc_test_file}" "${klee_bc_test_file}.bc" "${klee_bc_test_file}.ll"
+        #else
+        #    rm "${klee_bc_test_file}" "${klee_bc_test_file}.bc" "${klee_bc_test_file}.ll"
+        #    as_fn_error $? "Failed converting LLVM Bitcode to LLVM assembly. Maybe your LLVM versions do not match?" "$LINENO" 5
+        #fi
 
-    else
-        rm "${klee_bc_test_file}" "${klee_bc_test_file}.bc"
-        as_fn_error $? "Could not find llvm-dis" "$LINENO" 5
-    fi
+#    else
+#        rm "${klee_bc_test_file}" "${klee_bc_test_file}.bc"
+#        as_fn_error $? "Could not find llvm-dis" "$LINENO" 5
+#    fi
 }
 
 klee_check_bc "${klee_llvm_bc_c_compiler}" "c" "C"
