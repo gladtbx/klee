@@ -21,6 +21,7 @@
 #include "klee/Internal/System/Time.h"
 #include "klee/Internal/Support/PrintVersion.h"
 #include "klee/Internal/Support/ErrorHandling.h"
+#include "klee/util/InstErrPerc.h"
 
 #if LLVM_VERSION_CODE > LLVM_VERSION(3, 2)
 #include "llvm/IR/Constants.h"
@@ -79,6 +80,7 @@ namespace {
   cl::opt<std::string>
   InputFile(cl::desc("<input bytecode>"), cl::Positional, cl::init("-"));
 
+  //Gladtbx: how can we make use of this opt?
   cl::opt<std::string>
   EntryPoint("entry-point",
                cl::desc("Consider the function with the given name as the entrypoint"),
@@ -233,6 +235,9 @@ namespace {
 
   cl::opt<bool>
   ConstructSeedForTarget("constructSeedForTarget",cl::desc("Construct seeds for reaching target function"));
+
+  cl::opt<bool>
+  CalcInstErrPer("calcInstErrPer",cl::desc("Calculate the chance of causing errors per inst"),cl::init(0));
 }
 
 extern cl::opt<double> MaxTime;
@@ -244,7 +249,7 @@ private:
   Interpreter *m_interpreter;
   TreeStreamWriter *m_pathWriter, *m_symPathWriter;
   llvm::raw_ostream *m_infoFile;
-
+  instErrPerc* instErrorPerc;
   SmallString<128> m_outputDirectory;
 
   //Gladtbx: The target Functions.
@@ -290,12 +295,19 @@ public:
   const bool ifConstructSeedForTarget(){
 	  return ConstructSeedForTarget;
   }
+  void setInstErrPerc(instErrPerc* const _inst){
+	  instErrorPerc = _inst;
+  }
+  void calcErrPerc(){
+	  instErrorPerc->calcHue();
+  }
 };
 
 KleeHandler::KleeHandler(int argc, char **argv)
   : m_interpreter(0),
     m_pathWriter(0),
     m_symPathWriter(0),
+    instErrorPerc(0),
     m_infoFile(0),
     m_outputDirectory(),
     m_targetFunctions(),
@@ -491,6 +503,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
 
     unsigned id = ++m_testIndex;
 
+    /* Gladtbx: instead of writing to a .ktest file, we can generate a file containing the data, with a format we can define. */
     if (success) {
       KTest b;
       b.numArgs = m_argc;
@@ -535,6 +548,15 @@ void KleeHandler::processTestCase(const ExecutionState &state,
         *f << *I << "\n";
       }
       delete f;
+
+      if(instErrorPerc){
+    	  if(errorSuffix == 0 || (strcmp(errorSuffix,"early") == 0)){//Gladtbx: if we are at exit or at early exit, we mark the test case as passed.
+        	  instErrorPerc->processTestCase(true,concreteBranches,id);
+    	  }
+    	  else{
+        	  instErrorPerc->processTestCase(false,concreteBranches,id);
+    	  }
+      }
     }
 
     if (errorMessage || WriteKQueries) {
@@ -1109,6 +1131,7 @@ static void replaceOrRenameFunction(llvm::Module *module,
     }
   }
 }
+//Gladtbx: should add fscanf and scanf here.
 static llvm::Module *linkWithUclibc(llvm::Module *mainModule, StringRef libDir) {
   // Ensure that klee-uclibc exists
   SmallString<128> uclibcBCA(libDir);
@@ -1415,7 +1438,6 @@ int main(int argc, char **argv, char **envp) {
   if (!mainFn) {
     klee_error("'%s' function not found in module.", EntryPoint.c_str());
   }
-
   // FIXME: Change me to std types.
   int pArgc;
   char **pArgv;
@@ -1466,6 +1488,11 @@ int main(int argc, char **argv, char **envp) {
   KleeHandler *handler = new KleeHandler(pArgc, pArgv);
 
   handler->processTargetFunction();
+
+  if(CalcInstErrPer){
+	  handler->setInstErrPerc(new instErrPerc(&(mainFn->getEntryBlock())));
+  }
+
   Interpreter *interpreter = 
 
     theInterpreter = Interpreter::create(IOpts, handler);
@@ -1586,7 +1613,9 @@ int main(int argc, char **argv, char **envp) {
       seeds.pop_back();
     }
   }
-
+  if(CalcInstErrPer){
+	  handler->calcErrPerc();
+  }
   t[1] = time(NULL);
   strftime(buf, sizeof(buf), "Finished: %Y-%m-%d %H:%M:%S\n", localtime(&t[1]));
   handler->getInfoStream() << buf;
