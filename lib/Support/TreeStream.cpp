@@ -71,9 +71,9 @@ TreeOStream TreeStreamWriter::open(const TreeOStream &os) {
   assert(output && os.writer==this);
   flushBuffer();
   unsigned id = ids++;
-  output->write(reinterpret_cast<const char*>(&os.id), 4);
+  output->write(reinterpret_cast<const char*>(&os.id), 4);//Gladtbx: should be sizeof os.id. This is the os id, which I think is the "parent" id
   unsigned tag = id | (1<<31);
-  output->write(reinterpret_cast<const char*>(&tag), 4);
+  output->write(reinterpret_cast<const char*>(&tag), 4);//Gladtbx: this is the incremented is, which I think is the new id.
   return TreeOStream(*this, id);
 }
 
@@ -92,7 +92,7 @@ void TreeStreamWriter::write(TreeOStream &os, const char *s, unsigned size) {
   } else {
     output->write(reinterpret_cast<const char*>(&os.id), 4);
     output->write(reinterpret_cast<const char*>(&size), 4);
-    output->write(buffer, size);
+    output->write(buffer, size);//Gladtbx: Why write buffer?
   }
 #else
   output->write(reinterpret_cast<const char*>(&os.id), 4);

@@ -41,7 +41,7 @@ namespace klee {
     unsigned lastID, bufferCount;
 
     std::string path;
-    std::ofstream *output;
+    std::ofstream *output;//Gladtbx: format: osid,number of bytes,the bytes themselves. Alternatively, the size field is the child id, which means a fork happened.
     unsigned ids;
 
     void write(TreeOStream &os, const char *s, unsigned size);
