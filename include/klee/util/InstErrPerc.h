@@ -7,8 +7,10 @@
 #include "llvm/Support/Casting.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <algorithm>
+#include <map>
 
 class errPercNode{
 private:
@@ -19,6 +21,7 @@ private:
 	int errorVisit;
 	bool isBR;
 	double hue;
+	std::map<llvm::BasicBlock*, unsigned int> blockFail;
 public:
 	errPercNode():BB(0),visited(0),correctVisit(0),errorVisit(0),isBR(false),hue(0.0){
 
@@ -27,7 +30,7 @@ public:
 
 	}
 
-	const llvm::BasicBlock* getBB(){
+	llvm::BasicBlock* getBB(){
 		return BB;
 	}
 
@@ -79,6 +82,8 @@ public:
 	int get_error(){
 		return errorVisit;
 	}
+
+	void setBlockFail(llvm::BasicBlock* block);
 
 	void calc_hue(unsigned int const totalpassed, unsigned int const totalfailed){
 		if((correctVisit + errorVisit) == 0){
@@ -134,7 +139,7 @@ public:
 
 	void processTestCase(bool const pass,std::vector<unsigned char> const &concreteBranches, int const id);
 
-	void calcHue();
+	void calcHue(std::string outFileName);
 };
 
 #endif
