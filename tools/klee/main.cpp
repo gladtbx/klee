@@ -288,7 +288,7 @@ public:
 	  instErrorPerc = _inst;
   }
   void calcErrPerc(){
-	  instErrorPerc->calcHue();
+	  instErrorPerc->calcHue(getOutputFilename("suspiciousInstList.txt"));
   }
 };
 
