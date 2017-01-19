@@ -3,8 +3,13 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Value.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/GlobalAlias.h"
 #include "llvm/Support/DebugLoc.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include <iostream>
 #include <fstream>
@@ -16,12 +21,14 @@ class errPercNode{
 private:
 	llvm::BasicBlock* BB;
 	std::vector<errPercNode*> successors;
+	std::vector<errPercNode*> fCalls;
 	int visited;
 	int correctVisit;
 	int errorVisit;
 	bool isBR;
 	double hue;
 	std::map<llvm::BasicBlock*, unsigned int> blockFail;
+	std::pair<errPercNode*, std::vector<errPercNode*>::iterator> retLoc;
 public:
 	errPercNode():BB(0),visited(0),correctVisit(0),errorVisit(0),isBR(false),hue(0.0){
 
@@ -38,8 +45,16 @@ public:
 		successors.push_back(_succ);
 	}
 
+	void insertFcall(errPercNode* const fCall){
+		fCalls.push_back(fCall);
+	}
+
 	std::vector<errPercNode*> const &getSuccessor(){
 		return successors;
+	}
+
+	std::vector<errPercNode*> &getFcall(){
+		return fCalls;
 	}
 
 	void set_isBR(){
@@ -83,6 +98,14 @@ public:
 		return errorVisit;
 	}
 
+	void setRetLoc(std::pair<errPercNode*, std::vector<errPercNode*>::iterator> _retLoc){
+		retLoc = _retLoc;
+	}
+
+	std::pair<errPercNode*, std::vector<errPercNode*>::iterator> getRetLoc(){
+		return retLoc;
+	}
+
 	void setBlockFail(llvm::BasicBlock* block);
 
 	void calc_hue(unsigned int const totalpassed, unsigned int const totalfailed){
@@ -119,6 +142,12 @@ private:
 		return find_Block_Rec(root, target);
 	}
 
+	errPercNode* insertSuccNode(errPercNode* parent, llvm::BasicBlock* succ);
+
+	errPercNode* insertFcallNode(errPercNode* parent, llvm::BasicBlock* succ);
+
+	llvm::Function* getTargetFunction(llvm::Value *calledVal);
+
 	void init();
 
 	unsigned int totalpassed;
@@ -134,6 +163,8 @@ public:
 
 	instErrPerc(llvm::BasicBlock* const BB){
 		root = new errPercNode(BB);
+		totalpassed = 0;
+		totalfailed = 0;
 		init();
 	}
 

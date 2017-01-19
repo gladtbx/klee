@@ -1285,7 +1285,7 @@ void Executor::executeCall(ExecutionState &state,
                            std::vector< ref<Expr> > &arguments) {
   Instruction *i = ki->inst;
   if (f && f->isDeclaration()) {
-	 klee_warning(f->getName().data());
+	 klee_warning(f->getName().str().c_str());
     switch(f->getIntrinsicID()) {
     case Intrinsic::not_intrinsic:
       // state may be destroyed by this call, cannot touch
@@ -1560,7 +1560,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
     if (!isVoidReturn) {
       result = eval(ki, 0, state).value;
     }
-    
+
     if (state.stack.size() <= 1) {
       assert(!caller && "caller set on initial stack frame");
       terminateStateOnExit(state);
@@ -1906,7 +1906,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       }
 //Gladtbx: Execute call, may be special functions.
       executeCall(state, ki, f, arguments);
-    } else {
+    }
+    //Gladtbx: if the function we are calling is a function pointer, we need to resolve where it is pointing to first.
+    else {
       ref<Expr> v = eval(ki, 0, state).value;
 
       ExecutionState *free = &state;

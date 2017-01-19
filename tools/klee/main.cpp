@@ -291,8 +291,8 @@ public:
 
   static std::string getRunTimeLibraryPath(const char *argv0);
   void processTargetFunction();
-  const std::vector<std::string>& getTargetFunction();
-  const bool ifConstructSeedForTarget(){
+  std::vector<std::string>& getTargetFunction();
+  bool ifConstructSeedForTarget() const{
 	  return ConstructSeedForTarget;
   }
   void setInstErrPerc(instErrPerc* const _inst){
@@ -307,8 +307,8 @@ KleeHandler::KleeHandler(int argc, char **argv)
   : m_interpreter(0),
     m_pathWriter(0),
     m_symPathWriter(0),
-    instErrorPerc(0),
     m_infoFile(0),
+    instErrorPerc(0),
     m_outputDirectory(),
     m_targetFunctions(),
     m_testIndex(0),
@@ -721,7 +721,7 @@ void KleeHandler::processTargetFunction(){
 	 return;
 }
 
-const std::vector<std::string>& KleeHandler::getTargetFunction(){
+std::vector<std::string>& KleeHandler::getTargetFunction(){
 	return m_targetFunctions;
 }
 
@@ -1489,10 +1489,6 @@ int main(int argc, char **argv, char **envp) {
 
   handler->processTargetFunction();
 
-  if(CalcInstErrPer){
-	  handler->setInstErrPerc(new instErrPerc(&(mainFn->getEntryBlock())));
-  }
-
   Interpreter *interpreter = 
 
     theInterpreter = Interpreter::create(IOpts, handler);
@@ -1504,11 +1500,15 @@ int main(int argc, char **argv, char **envp) {
   handler->getInfoStream() << "PID: " << getpid() << "\n";
 
   const Module *finalModule =
-    interpreter->setModule(mainModule, Opts);
+    interpreter->setModule(mainModule, Opts);//setModule changes the BasicBlock* assignment.
   externalsAndGlobalsCheck(const_cast<Module*> (finalModule));
 
   if (ReplayPathFile != "") {
     interpreter->setReplayPath(&replayPath);
+  }
+
+  if(CalcInstErrPer){
+	  handler->setInstErrPerc(new instErrPerc(&(mainFn->getEntryBlock())));
   }
 
   char buf[256];
