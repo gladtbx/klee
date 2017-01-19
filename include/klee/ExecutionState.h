@@ -73,7 +73,7 @@ private:
 
   std::map<std::string, std::string> fnAliases;
 
-  int FscanfBytesRead = 0;
+  int FscanfBytesRead;
 
 public:
   // Execution - Control Flow specific
@@ -212,9 +212,9 @@ public:
   class IObuffer{
   private:
 	 std::vector<ref<Expr>  >numberbuf;
-	 bool neg = false;
+	 bool neg;
   public:
-	  IObuffer(){
+	  IObuffer():neg(false){
 
 	  };
 	  virtual ~IObuffer(){};
@@ -226,7 +226,7 @@ public:
 		  return numberbuf;
 	  };
 
-	  const bool getNeg() const{
+	  bool getNeg(){
 		  return neg;
 	  }
 

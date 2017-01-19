@@ -280,8 +280,8 @@ public:
 
   static std::string getRunTimeLibraryPath(const char *argv0);
   void processTargetFunction();
-  const std::vector<std::string>& getTargetFunction();
-  const bool ifConstructSeedForTarget(){
+  std::vector<std::string>& getTargetFunction();
+  bool ifConstructSeedForTarget() const{
 	  return ConstructSeedForTarget;
   }
   void setInstErrPerc(instErrPerc* const _inst){
@@ -293,8 +293,8 @@ public:
 };
 
 KleeHandler::KleeHandler(int argc, char **argv)
-    : m_interpreter(0), m_pathWriter(0), m_symPathWriter(0), instErrorPerc(0), m_infoFile(0),
-      m_outputDirectory(), m_targetFunctions(), m_numTotalTests(0), m_numGeneratedTests(0),
+<<<<<<< 415f83be9699b1e237b788bd045ce5153409a761
+    : m_interpreter(0), m_pathWriter(0), m_symPathWriter(0), m_infoFile(0), instErrorPerc(0), m_outputDirectory(), m_targetFunctions(), m_numTotalTests(0), m_numGeneratedTests(0),
       m_pathsExplored(0), m_argc(argc), m_argv(argv) {
 
   // create output directory (OutputDir or "klee-out-<i>")
@@ -692,7 +692,7 @@ void KleeHandler::processTargetFunction(){
 	 return;
 }
 
-const std::vector<std::string>& KleeHandler::getTargetFunction(){
+std::vector<std::string>& KleeHandler::getTargetFunction(){
 	return m_targetFunctions;
 }
 
@@ -1406,10 +1406,6 @@ int main(int argc, char **argv, char **envp) {
 
   handler->processTargetFunction();
 
-  if(CalcInstErrPer){
-	  handler->setInstErrPerc(new instErrPerc(&(mainFn->getEntryBlock())));
-  }
-
   Interpreter *interpreter = 
     theInterpreter = Interpreter::create(ctx, IOpts, handler);
   handler->setInterpreter(interpreter);
@@ -1420,11 +1416,15 @@ int main(int argc, char **argv, char **envp) {
   handler->getInfoStream() << "PID: " << getpid() << "\n";
 
   const Module *finalModule =
-    interpreter->setModule(mainModule, Opts);
+    interpreter->setModule(mainModule, Opts);//setModule changes the BasicBlock* assignment.
   externalsAndGlobalsCheck(const_cast<Module*> (finalModule));
 
   if (ReplayPathFile != "") {
     interpreter->setReplayPath(&replayPath);
+  }
+
+  if(CalcInstErrPer){
+	  handler->setInstErrPerc(new instErrPerc(&(mainFn->getEntryBlock())));
   }
 
   char buf[256];
