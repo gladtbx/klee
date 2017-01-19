@@ -67,6 +67,7 @@ StackFrame::~StackFrame() {
 /***/
 
 ExecutionState::ExecutionState(KFunction *kf) :
+	FscanfBytesRead(0),
     pc(kf->instructions),
     prevPC(pc),
 
@@ -84,7 +85,7 @@ ExecutionState::ExecutionState(KFunction *kf) :
 }
 
 ExecutionState::ExecutionState(const std::vector<ref<Expr> > &assumptions)
-    : constraints(assumptions), queryCost(0.), ptreeNode(0) {}
+    : FscanfBytesRead(0),constraints(assumptions), queryCost(0.), ptreeNode(0) {}
 
 ExecutionState::~ExecutionState() {
   for (unsigned int i=0; i<symbolics.size(); i++)
@@ -102,6 +103,7 @@ ExecutionState::~ExecutionState() {
 ExecutionState::ExecutionState(const ExecutionState& state):
     fnAliases(state.fnAliases),
     FscanfBytesRead(state.FscanfBytesRead),
+
     pc(state.pc),
     prevPC(state.prevPC),
     stack(state.stack),
@@ -126,8 +128,8 @@ ExecutionState::ExecutionState(const ExecutionState& state):
     arrayNames(state.arrayNames),
 	targetFunc(state.targetFunc),
 	ioBuffer(state.ioBuffer),
-	fileDescriptor(state.fileDescriptor),
-	bufferList(state.bufferList)
+	bufferList(state.bufferList),
+	fileDescriptor(state.fileDescriptor)
 
 {
   for (unsigned int i=0; i<symbolics.size(); i++)
