@@ -79,19 +79,24 @@ void instErrPerc::calcHue(std::string outFileName){
 }
 
 //FindBlock needs edit.
-errPercNode* instErrPerc::find_Block_Rec(errPercNode* curr, llvm::BasicBlock* const target){
+errPercNode* instErrPerc::find_Block_Rec(errPercNode* curr, llvm::BasicBlock* const target, int __id){
+	//sleep(1);
+	//std::cout<< tab << "Current Block: " << curr << " target block: " << target->getParent()->getName().str() << std::endl;
 	if(target == curr->getBB()){
+	//	std::cout<< tab << "Block: " << curr << " found target!" << std::endl;
 		return curr;
 	}
-	if(curr->get_visited() == -1){
+	if(curr->get_visited() == __id){
+	//	std::cout << tab << "Block: " << curr << " visited already!" << std::endl;
 		return NULL;
 	}
-	curr->set_visited();
+	curr->set_visited(__id);
 	errPercNode* ret = NULL;
 	const std::vector<errPercNode*> successors = curr->getSuccessor();
 	for(unsigned i = 0; i < successors.size(); i++){
 		if(successors[i]->get_visited()!=-1){
-			ret = find_Block_Rec(successors[i],target);
+			//tab+="  ";
+			ret = find_Block_Rec(successors[i],target,__id);
 			if(ret){
 				break;
 			}
@@ -101,14 +106,16 @@ errPercNode* instErrPerc::find_Block_Rec(errPercNode* curr, llvm::BasicBlock* co
 		const std::vector<errPercNode*> fcalls = curr->getFcall();
 		for(unsigned j = 0; j < fcalls.size(); j++){
 			if(fcalls[j]->get_visited()!=-1){
-				ret = find_Block_Rec(fcalls[j],target);
+				ret = find_Block_Rec(fcalls[j],target,__id);
 				if(ret){
 					break;
 				}
 			}
 		}
 	}
-	curr->set_unvisited();
+	//curr->set_unvisited();
+	//tab= tab.substr(0,tab.size()-2);
+	//std::cout<< "Block: " << curr << " do not found target, return!" << std::endl;
 	return ret;
 }
 
