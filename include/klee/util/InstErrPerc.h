@@ -16,6 +16,7 @@
 #include <vector>
 #include <algorithm>
 #include <map>
+#include "unistd.h"
 
 class errPercNode{
 private:
@@ -133,13 +134,18 @@ public:
 class instErrPerc{
 private:
 	errPercNode* root;
-	instErrPerc():root(NULL),totalpassed(0),totalfailed(0){
+	instErrPerc():root(NULL),totalpassed(0),totalfailed(0),id(-1){
 	}
 
-	errPercNode* find_Block_Rec(errPercNode* curr, llvm::BasicBlock* const target);
+	errPercNode* find_Block_Rec(errPercNode* curr, llvm::BasicBlock* const target, int __id);
 
 	errPercNode* find_Block(llvm::BasicBlock* const target){
-		return find_Block_Rec(root, target);
+		std::cout<< "=======================================" << std::endl;
+		std::cout<< "Start looking for block: " << target << std::endl;
+		errPercNode* ret = find_Block_Rec(root, target,id);
+		id--;
+		std::cout<< "=======================================" << std::endl;
+		return ret;
 	}
 
 	errPercNode* insertSuccNode(errPercNode* parent, llvm::BasicBlock* succ);
@@ -153,11 +159,14 @@ private:
 	unsigned int totalpassed;
 	unsigned int totalfailed;
 	std::vector< std::pair<double,errPercNode*> > suspiciousList;
+	int id;
+	std::string tab;
 public:
 	instErrPerc(errPercNode* &_root){
 		root = _root;
 		totalpassed = 0;
 		totalfailed = 0;
+		id = -1;
 		init();
 	}
 
@@ -165,6 +174,7 @@ public:
 		root = new errPercNode(BB);
 		totalpassed = 0;
 		totalfailed = 0;
+		id = -1;
 		init();
 	}
 
