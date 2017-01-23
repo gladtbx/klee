@@ -69,7 +69,13 @@ void instErrPerc::calcHue(std::string outFileName){
             	unsigned int line = insIt->getDebugLoc().getLine();
             	if(std::find(lineNum.begin(), lineNum.end(), line) == lineNum.end()){
             		lineNum.push_back(line);
-            		hueOutputFile << "line at: " << insIt->getDebugLoc().getLine();
+            		MDNode *N = insIt->getMetadata("dbg");
+            		StringRef File;
+            		if (N){
+            			DILocation Loc(N);
+            			File = Loc.getFilename();
+            		}
+            		hueOutputFile << "File: " << File.str() <<", line at: " << insIt->getDebugLoc().getLine();
             		hueOutputFile << " has a hue level of " << suspiciousList[i].first << std::endl;//LLVM 4.0 can provide file information. LLVM3.4 can not.
             	}
             }
