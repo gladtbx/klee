@@ -10,6 +10,7 @@
 #include "llvm/Support/DebugLoc.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/DebugInfo.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include <iostream>
 #include <fstream>
@@ -140,11 +141,11 @@ private:
 	errPercNode* find_Block_Rec(errPercNode* curr, llvm::BasicBlock* const target, int __id);
 
 	errPercNode* find_Block(llvm::BasicBlock* const target){
-		std::cout<< "=======================================" << std::endl;
-		std::cout<< "Start looking for block: " << target << std::endl;
+		//std::cout<< "=======================================" << std::endl;
+		//std::cout<< "Start looking for block: " << target << std::endl;
 		errPercNode* ret = find_Block_Rec(root, target,id);
 		id--;
-		std::cout<< "=======================================" << std::endl;
+		//std::cout<< "=======================================" << std::endl;
 		return ret;
 	}
 
