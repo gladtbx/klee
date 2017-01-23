@@ -17,6 +17,7 @@
 #include <vector>
 #include <algorithm>
 #include <map>
+#include <set>
 #include "unistd.h"
 
 class errPercNode{
@@ -141,11 +142,8 @@ private:
 	errPercNode* find_Block_Rec(errPercNode* curr, llvm::BasicBlock* const target, int __id);
 
 	errPercNode* find_Block(llvm::BasicBlock* const target){
-		//std::cout<< "=======================================" << std::endl;
-		//std::cout<< "Start looking for block: " << target << std::endl;
 		errPercNode* ret = find_Block_Rec(root, target,id);
 		id--;
-		//std::cout<< "=======================================" << std::endl;
 		return ret;
 	}
 

@@ -22,10 +22,13 @@ bool suspiciousCmp(const std::pair<double,errPercNode*> & first, const std::pair
 void instErrPerc::calcHue(std::string outFileName){
 //	std::vector<>;
 	std::ofstream hueOutputFile;
+
 	hueOutputFile.open(outFileName.c_str(),std::ofstream::out);
+
 	if(!hueOutputFile){
 		klee::klee_error("Failed to open suspiciousInstList.txt");
 	}
+
 	if(totalfailed == 0){
 		klee::klee_warning("No failed pass. No error percentage calculated\n");
 		hueOutputFile<<"No failed pass. No error percentage calculated\n";
@@ -75,25 +78,45 @@ void instErrPerc::calcHue(std::string outFileName){
             			DILocation Loc(N);
             			File = Loc.getFilename();
             		}
-            		hueOutputFile << "File: " << File.str() <<", line at: " << insIt->getDebugLoc().getLine();
+            		hueOutputFile << "File: " << File.str() <<", line at: " << line;
             		hueOutputFile << " has a hue level of " << suspiciousList[i].first << std::endl;//LLVM 4.0 can provide file information. LLVM3.4 can not.
             	}
             }
 		}
 	}
 	hueOutputFile.close();
+	std::ofstream gdbOutputFile;
+	gdbOutputFile.open(outFileName.insert(outFileName.find_last_of('/')+1,"gdb").c_str(),std::ofstream::out);
+	if(!gdbOutputFile){
+		klee::klee_error("Failed to open gdbSuspicious.txt");
+	}
+	std::set<BasicBlock*> processedBB;
+	for(unsigned int i = 0; i < suspiciousList.size();i++){
+		BasicBlock* parent = suspiciousList[i].second->getBB();
+		if(parent->getParent() && processedBB.find(parent) == processedBB.end()){
+			processedBB.insert(parent);
+			std::vector<unsigned int> lineNum;
+            BasicBlock::iterator insIt = parent->begin(), e = parent->end();
+            if(insIt != e){
+            	MDNode *N = insIt->getMetadata("dbg");
+				StringRef File;
+				if (N){
+					DILocation Loc(N);
+					File = Loc.getFilename();
+				}
+				gdbOutputFile << "break " << File.str() <<" : " << insIt->getDebugLoc().getLine() << std::endl;
+            }
+		}
+	}
 }
 
 //FindBlock needs edit.
 errPercNode* instErrPerc::find_Block_Rec(errPercNode* curr, llvm::BasicBlock* const target, int __id){
 	//sleep(1);
-	//std::cout<< tab << "Current Block: " << curr << " target block: " << target->getParent()->getName().str() << std::endl;
 	if(target == curr->getBB()){
-	//	std::cout<< tab << "Block: " << curr << " found target!" << std::endl;
 		return curr;
 	}
 	if(curr->get_visited() == __id){
-	//	std::cout << tab << "Block: " << curr << " visited already!" << std::endl;
 		return NULL;
 	}
 	curr->set_visited(__id);
@@ -119,9 +142,6 @@ errPercNode* instErrPerc::find_Block_Rec(errPercNode* curr, llvm::BasicBlock* co
 			}
 		}
 	}
-	//curr->set_unvisited();
-	//tab= tab.substr(0,tab.size()-2);
-	//std::cout<< "Block: " << curr << " do not found target, return!" << std::endl;
 	return ret;
 }
 
@@ -134,7 +154,6 @@ errPercNode* instErrPerc::insertSuccNode(errPercNode* parent, llvm::BasicBlock* 
 	}
 	else{//otherwise we need to point back
 		parent->insertSuccessor(nextNode);
-		//std::cout<<" Node linked: "<<nextNode->getBB()->getFirstNonPHI()->getDebugLoc().getLine()<<std::endl;
 	}
 	return NULL;
 }
@@ -148,7 +167,6 @@ errPercNode* instErrPerc::insertFcallNode(errPercNode* parent, llvm::BasicBlock*
 	}
 	else{//otherwise we need to point back
 		parent->insertFcall(nextNode);
-		//std::cout<<" Node linked: "<<nextNode->getBB()->getFirstNonPHI()->getDebugLoc().getLine()<<std::endl;
 	}
 	return NULL;
 }
@@ -191,31 +209,20 @@ void instErrPerc::init(){
 	worklist.push_back(root);
 	while(!worklist.empty()){
 		errPercNode* current = worklist.back();
-		//std::cout<<" Currently working on node: " << current << " with BB: " << current->getBB() << " line: " << current->getBB()->getFirstNonPHI()->getDebugLoc().getLine() << std::endl;
 		worklist.pop_back();
-		//std::cout<<"Processing Func: " << current->getBB()->getParent()->getName().str() << std::endl;
 
 		//Deal with fun Calls
 		for(llvm::BasicBlock::iterator it = current->getBB()->begin(); it != current->getBB()->end(); it++){
-			/*if(!current->getBB()->getParent()->getName().str().compare("start_game")){
-				it->dump();
-				std::cout<< it->getOpcodeName() << std::endl;
-				std::cout<< it->getOpcode() << std::endl;
-			}*/
+
 			if(it->getOpcode() == llvm::Instruction::Call){
-				//it->dump();
 				llvm::CallInst* callInst = cast<CallInst>(it);
 				llvm::Value* targetValue = callInst->getCalledValue();
 				llvm::Function* targetFunc = getTargetFunction(targetValue);
 				if(targetFunc)
-				//std::cout<<"Find Func: " << targetFunc->getName().str() << std::endl;
 				if(targetFunc && ! targetFunc->isDeclaration()){
 					if(targetFunc->begin() != targetFunc->end()){
-						//std::cout<<"Adding Func: " << targetFunc->getName().str() << std::endl;
 						errPercNode* calledNode = insertFcallNode(current,&(targetFunc->getEntryBlock()));
-						//targetFunc->getEntryBlock().dump();
 						if(calledNode){
-							//std::cout<<"WorkList Func: " << calledNode->getBB()->getParent()->getName().str() << std::endl;
 							worklist.push_back(calledNode);//If the called node hasn't been explored before, we need to add it to the worklist.
 						}
 					}
@@ -225,20 +232,7 @@ void instErrPerc::init(){
 		//Deal with terminators
 		const llvm::TerminatorInst* ti = current->getBB()->getTerminator();
 		if(ti->getOpcode() == llvm::Instruction::Ret){
-			/* I am an idiot to write this piece of code.
-			 * if(root->getBB()->getParent() != current->getBB()->getParent()){
-				//inserting the parent node as the only next node.
-				errPercNode* parentNode = insertSuccNode(current,ti->getSuccessor(0));
-				assert(parentNode && "Return cannot find parent node!");
-				std::vector<errPercNode*> fCalls = parentNode->getFcall();
-				std::vector<errPercNode*>::iterator fCallIt;
-				for(fCallIt = fCalls.begin(); fCallIt != fCalls.end(); fCallIt++){
-					if((*fCallIt) == current){
-						current->setRetLoc(fCallIt);
-					}
-				}
-				assert(fCallIt != fCalls.end() && "errPercNode Error: Child node not found in parent's call list");
-			}*/
+
 		}
 		else{
 			if(ti->getOpcode() == llvm::Instruction::Br){
@@ -251,7 +245,6 @@ void instErrPerc::init(){
 				llvm::BasicBlock* succ = ti->getSuccessor(I);
 				errPercNode* nextNode = insertSuccNode(current,succ);
 				if(nextNode){
-					//std::cout<<"Node: " << current << " is having: " << nextNode << " as child" << std::endl;
 					worklist.push_back(nextNode);
 				}
 			}
@@ -327,36 +320,7 @@ void instErrPerc::processTestCase(bool const pass,std::vector<unsigned char> con
 				for (BasicBlock::iterator it = currNode->getBB()->begin(); it != currNode->getBB()->end(); it++){
 					std::cout<< it->getDebugLoc().getLine() << std::endl;
 				}
-				//currNode->getBB()->dump();
-/*				currNode = root;
-				for(int j = 0; j < concreteBranches.size(); j++){
-					while(!currNode->is_BR()){
-						successor = currNode->getSuccessor();
-						if(successor.size() == 0){
-							return;
-						}
-						else{
-							currNode = successor[0];//Gladtbx assuming none BR nodes only have one successor;
-						}
-					}
-					for (BasicBlock::iterator itt = currNode->getBB()->begin(); itt != currNode->getBB()->end(); itt++){
-						std::cout<< itt->getDebugLoc().getLine() << std::endl;
-					}
-					std::cout<< "					successor 0 is: " << currNode->getSuccessor()[0] << std::endl;
-					std::cout<< "					successor 1 is: " << currNode->getSuccessor()[1] << std::endl;
-					if(concreteBranches[j] == '0'){//if it is 0 then we follow the false branch, which is 1.
-						std::cout<< "Taking False branch now" << std::endl;
-						currNode = currNode->getSuccessor()[1];
-						std::cout<< "Next node is: " << currNode << std::endl;
-					}
-					else if (concreteBranches[j] == '1'){
-						currNode = currNode->getSuccessor()[0];
-						std::cout<< "Taking True branch now" << std::endl;
-						std::cout<< "Next node is: " << currNode << std::endl;
-					}
-				}*/
 				assert(0&&"No successor!");
-				//return;
 			}
 			else{
 				//successor[0]->setRetLoc(currNode->getRetLoc());//Need to pass on the info about return location.
@@ -374,28 +338,13 @@ void instErrPerc::processTestCase(bool const pass,std::vector<unsigned char> con
 				visitedNodes.push_back(currNode);
 			}
 		}
-		/*
-		std::cout<< "Currently at line: " << currNode->getBB()->getTerminator()->getDebugLoc().getLine() << std::endl;
-		std::cout<< "i is: " << i << " out of " << concreteBranches.size() << std::endl;
-		std::cout<< "					successor 0 is: " << currNode->getSuccessor()[0] << std::endl;
-		std::cout<< "					successor 1 is: " << currNode->getSuccessor()[1] << std::endl;*/
 		if(concreteBranches[i] == '0'){//if it is 0 then we follow the false branch, which is 1.
-			//std::cout<< "Taking False branch now" << std::endl;
-			//currNode->getSuccessor()[1]->getBB()->dump();
-			//currNode->getSuccessor()[0]->getBB()->dump();
-			//currNode->getSuccessor()[1]->setRetLoc(currNode->getRetLoc());//Need to pass on the info about return location.
 			currNode = currNode->getSuccessor()[1];
 			fcallIt = currNode->getFcall().begin();
-			//std::cout<< "Next node is: " << currNode << std::endl;
 		}
 		else if (concreteBranches[i] == '1'){
-			//currNode->getSuccessor()[1]->getBB()->dump();
-			//currNode->getSuccessor()[0]->getBB()->dump();
-			//currNode->getSuccessor()[0]->setRetLoc(currNode->getRetLoc());//Need to pass on the info about return location.
 			currNode = currNode->getSuccessor()[0];
 			fcallIt = currNode->getFcall().begin();
-			//std::cout<< "Taking True branch now" << std::endl;
-			//std::cout<< "Next node is: " << currNode << std::endl;
 		}
 		else{
 			assert(0 && "instErrPerc: Concrete Branches having value other than 0 or 1");
@@ -410,6 +359,10 @@ void instErrPerc::processTestCase(bool const pass,std::vector<unsigned char> con
 			visitedNodes.push_back(currNode);
 		}
 	}
+	/*	Some extra work needs to be done:
+	 *  Look for the cause of the error.
+	 *  Mark the test case number
+	 *  And create a list of suspicious variable names. */
 	for(unsigned int i = 0; i < visitedNodes.size(); i++){
 		visitedNodes[i]->setBlockFail(currNode->getBB());
 		visitedNodes[i]->set_correct(pass);
