@@ -39,6 +39,7 @@ void instErrPerc::calcHue(std::string outFileName){
 		hueOutputFile<<"No failed pass. No error percentage calculated\n";
 		gdbOutputFile<<"No failed pass. No gdb debugging info generated\n";
 		hueOutputFile.close();
+		gdbOutputFile.close();
 		return;
 	}
 	std::vector<errPercNode*> worklist;
