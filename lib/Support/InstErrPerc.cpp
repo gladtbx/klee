@@ -22,6 +22,11 @@ bool suspiciousCmp(const std::pair<double,errPercNode*> & first, const std::pair
 void instErrPerc::calcHue(std::string outFileName){
 //	std::vector<>;
 	std::ofstream hueOutputFile;
+	std::ofstream gdbOutputFile;
+	gdbOutputFile.open(outFileName.insert(outFileName.find_last_of('/')+1,"gdb").c_str(),std::ofstream::out);
+	if(!gdbOutputFile){
+		klee::klee_error("Failed to open gdbSuspicious.txt");
+	}
 
 	hueOutputFile.open(outFileName.c_str(),std::ofstream::out);
 
@@ -32,6 +37,7 @@ void instErrPerc::calcHue(std::string outFileName){
 	if(totalfailed == 0){
 		klee::klee_warning("No failed pass. No error percentage calculated\n");
 		hueOutputFile<<"No failed pass. No error percentage calculated\n";
+		gdbOutputFile<<"No failed pass. No gdb debugging info generated\n";
 		hueOutputFile.close();
 		return;
 	}
@@ -85,11 +91,7 @@ void instErrPerc::calcHue(std::string outFileName){
 		}
 	}
 	hueOutputFile.close();
-	std::ofstream gdbOutputFile;
-	gdbOutputFile.open(outFileName.insert(outFileName.find_last_of('/')+1,"gdb").c_str(),std::ofstream::out);
-	if(!gdbOutputFile){
-		klee::klee_error("Failed to open gdbSuspicious.txt");
-	}
+
 	std::set<BasicBlock*> processedBB;
 	for(unsigned int i = 0; i < suspiciousList.size();i++){
 		BasicBlock* parent = suspiciousList[i].second->getBB();
