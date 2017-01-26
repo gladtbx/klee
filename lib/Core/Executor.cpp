@@ -3061,6 +3061,30 @@ void Executor::terminateStateOnError(ExecutionState &state,
 
     interpreterHandler->processTestCase(state, msg.str().c_str(), suffix);
   }
+  else{
+	std::string MsgString;
+	llvm::raw_string_ostream msg(MsgString);
+	msg << "Error: " << message << "\n";
+	if (ii.file != "") {
+	  msg << "File: " << ii.file << "\n";
+	  msg << "Line: " << ii.line << "\n";
+	  msg << "assembly.ll line: " << ii.assemblyLine << "\n";
+	}
+	msg << "Stack: \n";
+	state.dumpStack(msg);
+
+	std::string info_str = info.str();
+	if (info_str != "")
+	  msg << "Info: \n" << info_str;
+
+	std::string suffix_buf;
+	if (!suffix) {
+	  suffix_buf = TerminateReasonNames[termReason];
+	  suffix_buf += ".err";
+	  suffix = suffix_buf.c_str();
+	}
+	interpreterHandler->processPathInfo(state, msg.str().c_str(), suffix);
+  }
     
   terminateState(state);
 

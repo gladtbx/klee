@@ -20,7 +20,6 @@ bool suspiciousCmp(const std::pair<double,errPercNode*> & first, const std::pair
 
 //Gladtbx: Need to explore fCalls as well.
 void instErrPerc::calcHue(std::string outFileName){
-//	std::vector<>;
 	std::ofstream hueOutputFile;
 	std::ofstream gdbOutputFile;
 	gdbOutputFile.open(outFileName.insert(outFileName.find_last_of('/')+1,"gdb").c_str(),std::ofstream::out);
@@ -47,11 +46,8 @@ void instErrPerc::calcHue(std::string outFileName){
 	while(!worklist.empty()){
 		errPercNode* current = worklist.back();
 		worklist.pop_back();
-		//current->set_visited();
 		current->set_visited(-2);
 		//Actual calculation done here.
-		//std::cout<<"line: " <<current->getBB()->getFirstNonPHI()->getDebugLoc().getLine()<< " has " << current->get_correct() << " correct passes and "
-		//	<< current->get_error() << " error passes" << std::endl;
 		current->calc_hue(totalpassed,totalfailed);
 		suspiciousList.push_back(std::pair<double,errPercNode*> (current->get_hue(),current));
 		std::vector<errPercNode*> successor = current->getSuccessor();
@@ -279,16 +275,10 @@ void instErrPerc::processTestCase(bool const pass,std::vector<unsigned char> con
 					visitedNodes.push_back(currNode);
 				}
 			}
-			//If we have fcalls, we need to do the fcalls in order.
 			if(fcallIt != currNode->getFcall().end()){
-				//std::cout<< currNode->getBB()->getParent()->getName().str() <<" is calling ";
 				if((*fcallIt) == NULL){
 					assert(0 && "fcallIt is NULL" );
 				}
-				//std::cout<< (*fcallIt)->getBB()->getParent()->getName().str() << std::endl;
-				//Assuming we don't have recursion.
-				//Gladtbx: FIXME now we only take the return node and iterator for the last calling node. Can not handle recursion of any kind.
-				//(*fcallIt)->setRetLoc(std::pair<errPercNode*,std::vector<errPercNode*>::iterator> (currNode, fcallIt));
 				stack.push_back(std::pair<errPercNode*,std::vector<errPercNode*>::iterator> (currNode, fcallIt));
 				currNode = *fcallIt;
 				fcallIt = currNode->getFcall().begin();
@@ -301,32 +291,21 @@ void instErrPerc::processTestCase(bool const pass,std::vector<unsigned char> con
 				break;
 			}
 			if(currNode->getBB()->getTerminator()->getOpcode() == llvm::Instruction::Ret){
-				//std::cout<< "Processing Ret!"<< std::endl;
 				std::pair<errPercNode*,std::vector<errPercNode*>::iterator> retPair = stack.back();
 				stack.pop_back();
 				fcallIt = retPair.second;
 				fcallIt++;//fcallIt only increments when we return from a call.
-				//std::cout<< currNode->getBB()->getParent()->getName().str() << " is returning to ";
 				currNode = retPair.first;
-				//std::cout<< currNode->getBB()->getParent()->getName().str() << std::endl;
-				/*if(fcallIt != currNode->getFcall().end()){
-					std::cout<< "Next call will be: " << (*fcallIt)->getBB()->getParent()->getName().str() << std::endl;
-				}
-				else{
-					std::cout<< "Fcall ended!" << std::endl;
-				}*/
 				continue;
 			}
 			std::vector<errPercNode*> successor = currNode->getSuccessor();
 			if(successor.size() == 0){
-				//std::cout<< i << " out of " << concreteBranches.size() << std::endl;
 				for (BasicBlock::iterator it = currNode->getBB()->begin(); it != currNode->getBB()->end(); it++){
 					std::cout<< it->getDebugLoc().getLine() << std::endl;
 				}
 				assert(0&&"No successor!");
 			}
 			else{
-				//successor[0]->setRetLoc(currNode->getRetLoc());//Need to pass on the info about return location.
 				currNode = successor[0];//Gladtbx assuming none BR nodes only have one successor;
 				fcallIt = currNode->getFcall().begin();
 			}
