@@ -632,7 +632,7 @@ void KleeHandler::processTestCase(const ExecutionState &state,
 void KleeHandler::processPathInfo(const ExecutionState &state,
                                   const char *errorMessage,
                                   const char *errorSuffix) {
-	if(instErrorPerc){
+	if(instErrorPerc && m_pathWriter){
 		unsigned id = ++m_testIndex;
 		std::vector<unsigned char> concreteBranches;
 		m_pathWriter->readStream(m_interpreter->getPathStreamID(state),
