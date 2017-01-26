@@ -46,6 +46,8 @@ public:
                                const char *suffix) = 0;
   virtual std::vector<std::string>& getTargetFunction() = 0;
 
+  virtual void processPathInfo(const ExecutionState & state, const char* err, const char *suffix) = 0;
+
   virtual bool ifConstructSeedForTarget() const = 0;
 };
 
