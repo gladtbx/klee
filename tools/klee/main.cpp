@@ -277,6 +277,11 @@ public:
                        const char *errorMessage,
                        const char *errorSuffix);
 
+
+  void processPathInfo(const ExecutionState  &state,
+                       const char *errorMessage,
+                       const char *errorSuffix);
+
   std::string getOutputFilename(const std::string &filename);
   llvm::raw_fd_ostream *openOutputFile(const std::string &filename);
   std::string getTestFilename(const std::string &suffix, unsigned id);
@@ -622,6 +627,24 @@ void KleeHandler::processTestCase(const ExecutionState &state,
       delete f;
     }
   }
+}
+
+void KleeHandler::processPathInfo(const ExecutionState &state,
+                                  const char *errorMessage,
+                                  const char *errorSuffix) {
+	if(instErrorPerc){
+		unsigned id = ++m_testIndex;
+		std::vector<unsigned char> concreteBranches;
+		m_pathWriter->readStream(m_interpreter->getPathStreamID(state),
+                                   concreteBranches);
+
+		if(errorSuffix == 0 || (strcmp(errorSuffix,"early") == 0)){//Gladtbx: if we are at exit or at early exit, we mark the test case as passed.
+			instErrorPerc->processTestCase(true,concreteBranches,id);
+		}
+		else{
+			instErrorPerc->processTestCase(false,concreteBranches,id);
+		}
+	}
 }
 
   // load a .path file
