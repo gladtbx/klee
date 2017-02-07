@@ -1512,8 +1512,6 @@ int main(int argc, char **argv, char **envp) {
 
   handler->processTargetFunction();
 
-  Interpreter *interpreter = 
-
   Interpreter *interpreter =
     theInterpreter = Interpreter::create(IOpts, handler);
   handler->setInterpreter(interpreter);
