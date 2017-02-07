@@ -989,6 +989,14 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
         falseState->symPathOS << "0";
       }
     }
+    else{
+    	if (pathWriter){
+    		falseState->pathOS = pathWriter->open(current.pathOS);
+    	}
+    	if (symPathWriter) {
+            falseState->symPathOS = symPathWriter->open(current.symPathOS);
+    	}
+    }
 
     addConstraint(*trueState, condition);
     addConstraint(*falseState, Expr::createIsZero(condition));
