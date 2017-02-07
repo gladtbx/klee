@@ -92,7 +92,7 @@ void TreeStreamWriter::write(TreeOStream &os, const char *s, unsigned size) {
   } else {
     output->write(reinterpret_cast<const char*>(&os.id), 4);
     output->write(reinterpret_cast<const char*>(&size), 4);
-    output->write(buffer, size);//Gladtbx: Why write buffer?
+    output->write(s, size);//Gladtbx: Why write buffer?
   }
 #else
   output->write(reinterpret_cast<const char*>(&os.id), 4);
