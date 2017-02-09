@@ -911,7 +911,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
   if (res==Solver::True) {
     if (!isInternal) {
       if (pathWriter) {
-        current.pathOS << "1";
+    	  current.pathOS << "1";
       }
     }
 
@@ -919,7 +919,7 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
   } else if (res==Solver::False) {
     if (!isInternal) {
       if (pathWriter) {
-        current.pathOS << "0";
+    	  current.pathOS << "0";
       }
     }
 
@@ -1584,6 +1584,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       ConstantInt *ci = ConstantInt::get(Ty, CE->getZExtValue());
       unsigned index = si->findCaseValue(ci).getSuccessorIndex();
       transferToBasicBlock(si->getSuccessor(index), si->getParent(), state);
+      state.pathOS << index;
     } else {
       // Handle possible different branch targets
 
@@ -1593,7 +1594,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       // - order of case branches is based on the order of the expressions of
       //   the scase values, still default is handled last
       std::vector<BasicBlock *> bbOrder;
-      std::map<BasicBlock *, ref<Expr> > branchTargets;
+      std::map<BasicBlock *, std::pair<ref<Expr>, int> > branchTargets;
 
       std::map<ref<Expr>, BasicBlock *> expressionOrder;
 
@@ -1614,11 +1615,13 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       //Gladtbx: isDefault = match = zero. default can be reached when nothing can be matched.
       ref<Expr> defaultValue = ConstantExpr::alloc(1, Expr::Bool);
 
+      int pathOS = 0;
       // iterate through all non-default cases but in order of the expressions
       for (std::map<ref<Expr>, BasicBlock *>::iterator
                it = expressionOrder.begin(),
                itE = expressionOrder.end();
            it != itE; ++it) {
+         //  it != itE; ++it, pathOS++) {
         ref<Expr> match = EqExpr::create(cond, it->first);
           //Gladtbx: match = condition evaluated to value
 
@@ -1642,11 +1645,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
           // values for the same target basic block. We spare us forking too
           // many times but we generate more complex condition expressions
           // TODO Add option to allow to choose between those behaviors
-          std::pair<std::map<BasicBlock *, ref<Expr> >::iterator, bool> res =
+          std::pair<std::map<BasicBlock *, std::pair<ref<Expr>, int> >::iterator, bool> res =
               branchTargets.insert(std::make_pair(
-                  caseSuccessor, ConstantExpr::alloc(0, Expr::Bool)));
+                  caseSuccessor, std::make_pair(ConstantExpr::alloc(0, Expr::Bool), pathOS)));
 
-          res.first->second = OrExpr::create(match, res.first->second);
+          res.first->second.first = OrExpr::create(match, res.first->second.first);
 
           // Only add basic blocks which have not been target of a branch yet
           if (res.second) {
@@ -1662,9 +1665,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       assert(success && "FIXME: Unhandled solver failure");
       (void) success;
       if (res) {
-        std::pair<std::map<BasicBlock *, ref<Expr> >::iterator, bool> ret =
+        std::pair<std::map<BasicBlock *, std::pair<ref<Expr>, int> >::iterator, bool> ret =
             branchTargets.insert(
-                std::make_pair(si->getDefaultDest(), defaultValue));
+                std::make_pair(si->getDefaultDest(), std::make_pair(defaultValue, pathOS)));
         if (ret.second) {
           bbOrder.push_back(si->getDefaultDest());
         }
@@ -1676,7 +1679,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       for (std::vector<BasicBlock *>::iterator it = bbOrder.begin(),
                                                ie = bbOrder.end();
            it != ie; ++it) {
-        conditions.push_back(branchTargets[*it]);
+        conditions.push_back(branchTargets[*it].first);
       }
       std::vector<ExecutionState*> branches;
       branch(state, conditions, branches);
@@ -1686,6 +1689,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
                                                ie = bbOrder.end();
            it != ie; ++it) {
         ExecutionState *es = *bit;
+        es->pathOS = pathWriter->open(state.pathOS);
+        es->pathOS << branchTargets[*it].second;
         if (es)
           transferToBasicBlock(*it, bb, *es);
         ++bit;

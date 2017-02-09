@@ -57,6 +57,7 @@
 #include <iomanip>
 #include <iterator>
 #include <sstream>
+#include <iostream>
 
 
 using namespace llvm;
@@ -462,7 +463,6 @@ void KleeHandler::processTestCase(const ExecutionState &state,
     m_interpreter->prepareForEarlyExit();
     klee_error("EXITING ON ERROR:\n%s\n", errorMessage);
   }
-
   if(OnlyKtestForTarget){
 	  /*if(!state.targetFunc()){
 		  klee_warning("Test case not covering interested function, dropping");

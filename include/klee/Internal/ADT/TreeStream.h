@@ -82,6 +82,8 @@ namespace klee {
 
     TreeOStream &operator<<(const std::string &s);
 
+    TreeOStream &operator<<(const int &s);
+
     void flush();
   };
 }
