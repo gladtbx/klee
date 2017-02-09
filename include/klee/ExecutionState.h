@@ -65,7 +65,6 @@ struct StackFrame {
 class ExecutionState {
 public:
   typedef std::vector<StackFrame> stack_ty;
-
 private:
   // unsupported, use copy constructor
   ExecutionState &operator=(const ExecutionState &);

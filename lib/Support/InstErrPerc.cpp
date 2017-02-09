@@ -1,8 +1,9 @@
 #include "klee/util/InstErrPerc.h"
 using namespace llvm;
 
-void errPercNode::setBlockFail(llvm::BasicBlock* block){
-	std::pair<std::map<llvm::BasicBlock*, unsigned int>::iterator,bool> it = blockFail.insert(std::pair<llvm::BasicBlock*, unsigned int> (block,1));
+void errPercNode::setBlockFail(const llvm::BasicBlock* block){
+	std::pair<std::map<const llvm::BasicBlock*, unsigned int>::iterator,bool> it =
+			blockFail.insert(std::pair<const llvm::BasicBlock*, unsigned int> (block,1));
 	if(!it.second){
 		return;
 	}
@@ -71,7 +72,7 @@ void instErrPerc::calcHue(std::string outFileName){
 	for(unsigned int i = 0; i < suspiciousList.size();i++){
 		if(suspiciousList[i].second->getBB()->getParent()){
 			std::vector<unsigned int> lineNum;
-            for (BasicBlock::iterator insIt = suspiciousList[i].second->getBB()->begin(), e = suspiciousList[i].second->getBB()->end(); insIt != e; ++insIt){
+            for (BasicBlock::const_iterator insIt = suspiciousList[i].second->getBB()->begin(), e = suspiciousList[i].second->getBB()->end(); insIt != e; ++insIt){
             	unsigned int line = insIt->getDebugLoc().getLine();
             	if(std::find(lineNum.begin(), lineNum.end(), line) == lineNum.end()){
             		lineNum.push_back(line);
@@ -89,13 +90,13 @@ void instErrPerc::calcHue(std::string outFileName){
 	}
 	hueOutputFile.close();
 
-	std::set<BasicBlock*> processedBB;
+	std::set<const BasicBlock*> processedBB;
 	for(unsigned int i = 0; i < suspiciousList.size();i++){
-		BasicBlock* parent = suspiciousList[i].second->getBB();
+		const BasicBlock* parent = suspiciousList[i].second->getBB();
 		if(parent->getParent() && processedBB.find(parent) == processedBB.end()){
 			processedBB.insert(parent);
 			std::vector<unsigned int> lineNum;
-            BasicBlock::iterator insIt = parent->begin(), e = parent->end();
+            BasicBlock::const_iterator insIt = parent->begin(), e = parent->end();
             if(insIt != e){
             	MDNode *N = insIt->getMetadata("dbg");
 				StringRef File;
@@ -110,7 +111,7 @@ void instErrPerc::calcHue(std::string outFileName){
 }
 
 //FindBlock needs edit.
-errPercNode* instErrPerc::find_Block_Rec(errPercNode* curr, llvm::BasicBlock* const target, int __id){
+errPercNode* instErrPerc::find_Block_Rec(errPercNode* curr, const llvm::BasicBlock* target, int __id){
 	//sleep(1);
 	if(target == curr->getBB()){
 		return curr;
@@ -144,7 +145,7 @@ errPercNode* instErrPerc::find_Block_Rec(errPercNode* curr, llvm::BasicBlock* co
 	return ret;
 }
 
-errPercNode* instErrPerc::insertSuccNode(errPercNode* parent, llvm::BasicBlock* succ){
+errPercNode* instErrPerc::insertSuccNode(errPercNode* parent, const llvm::BasicBlock* succ){
 	errPercNode* nextNode = find_Block(succ);//we have to use findBlock because we can not mark the llvm Basic Block directly.
 	if(nextNode == NULL){
 		errPercNode* succ_node = new errPercNode(succ);
@@ -157,7 +158,7 @@ errPercNode* instErrPerc::insertSuccNode(errPercNode* parent, llvm::BasicBlock* 
 	return NULL;
 }
 
-errPercNode* instErrPerc::insertFcallNode(errPercNode* parent, llvm::BasicBlock* succ){
+errPercNode* instErrPerc::insertFcallNode(errPercNode* parent, const llvm::BasicBlock* succ){
 	errPercNode* nextNode = find_Block(succ);//we have to use findBlock because we can not mark the llvm Basic Block directly.
 	if(nextNode == NULL){
 		errPercNode* succ_node = new errPercNode(succ);
@@ -170,25 +171,25 @@ errPercNode* instErrPerc::insertFcallNode(errPercNode* parent, llvm::BasicBlock*
 	return NULL;
 }
 
-Function* instErrPerc::getTargetFunction(Value *calledVal) {
+const Function* instErrPerc::getTargetFunction(const Value *calledVal) {
   SmallPtrSet<const GlobalValue*, 3> Visited;
 
-  Constant *c = dyn_cast<Constant>(calledVal);
+  const Constant *c = dyn_cast<Constant>(calledVal);
   if (!c)
     return 0;
 
   while (true) {
-    if (GlobalValue *gv = dyn_cast<GlobalValue>(c)) {
+    if (const GlobalValue *gv = dyn_cast<GlobalValue>(c)) {
       if (!Visited.insert(gv))
         return 0;
 
-      if (Function *f = dyn_cast<Function>(gv))
+      if (const Function *f = dyn_cast<Function>(gv))
         return f;
-      else if (GlobalAlias *ga = dyn_cast<GlobalAlias>(gv))
+      else if (const GlobalAlias *ga = dyn_cast<GlobalAlias>(gv))
         c = ga->getAliasee();
       else
         return 0;
-    } else if (llvm::ConstantExpr *ce = dyn_cast<llvm::ConstantExpr>(c)) {
+    } else if (const llvm::ConstantExpr *ce = dyn_cast<llvm::ConstantExpr>(c)) {
       if (ce->getOpcode()==Instruction::BitCast)
         c = ce->getOperand(0);
       else
@@ -209,14 +210,13 @@ void instErrPerc::init(){
 	while(!worklist.empty()){
 		errPercNode* current = worklist.back();
 		worklist.pop_back();
-
 		//Deal with fun Calls
-		for(llvm::BasicBlock::iterator it = current->getBB()->begin(); it != current->getBB()->end(); it++){
+		for(llvm::BasicBlock::const_iterator it = current->getBB()->begin(); it != current->getBB()->end(); it++){
 
 			if(it->getOpcode() == llvm::Instruction::Call){
-				llvm::CallInst* callInst = cast<CallInst>(it);
-				llvm::Value* targetValue = callInst->getCalledValue();
-				llvm::Function* targetFunc = getTargetFunction(targetValue);
+				const llvm::CallInst* callInst = cast<CallInst>(it);
+				const llvm::Value* targetValue = callInst->getCalledValue();
+				const llvm::Function* targetFunc = getTargetFunction(targetValue);
 				if(targetFunc)
 				if(targetFunc && ! targetFunc->isDeclaration()){
 					if(targetFunc->begin() != targetFunc->end()){
@@ -232,6 +232,20 @@ void instErrPerc::init(){
 		const llvm::TerminatorInst* ti = current->getBB()->getTerminator();
 		if(ti->getOpcode() == llvm::Instruction::Ret){
 
+		}
+		else if(ti->getOpcode() == llvm::Instruction::Switch){
+			const SwitchInst *bi = cast<SwitchInst>(ti);
+			current->set_isBR();
+			errPercNode* nextNode = insertSuccNode(current, bi->case_default().getCaseSuccessor());//default is zero, then cases
+			if(nextNode){
+				worklist.push_back(nextNode);
+			}
+			for(llvm::SwitchInst::ConstCaseIt it = bi->case_begin(); it != bi->case_end() ; it++ ){
+				errPercNode* nextNode = insertSuccNode(current, it.getCaseSuccessor());
+				if(nextNode){
+					worklist.push_back(nextNode);
+				}
+			}
 		}
 		else{
 			if(ti->getOpcode() == llvm::Instruction::Br){
@@ -264,7 +278,7 @@ void instErrPerc::processTestCase(bool const pass,std::vector<unsigned char> con
 	}
 	for(unsigned int i = 0; i < concreteBranches.size(); i++){
 		while(!currNode->is_BR() || fcallIt != currNode->getFcall().end()){
-			//std::cout<<" Currently working on node: " << currNode << " with BB: " << currNode->getBB() << " line: " << currNode->getBB()->getFirstNonPHI()->getDebugLoc().getLine() << std::endl;
+			//std::cout<<" Currently working on node: " << currNode->getBB()->getParent()->getName().str() << " with BB: " << currNode->getBB() << " line: " << currNode->getBB()->getTerminator()->getDebugLoc().getLine() << std::endl;
 			//currNode->getBB()->dump();
 			if(currNode->get_visited() != id){
 				currNode->set_visited(id);
@@ -300,7 +314,7 @@ void instErrPerc::processTestCase(bool const pass,std::vector<unsigned char> con
 			}
 			std::vector<errPercNode*> successor = currNode->getSuccessor();
 			if(successor.size() == 0){
-				for (BasicBlock::iterator it = currNode->getBB()->begin(); it != currNode->getBB()->end(); it++){
+				for (BasicBlock::const_iterator it = currNode->getBB()->begin(); it != currNode->getBB()->end(); it++){
 					std::cout<< it->getDebugLoc().getLine() << std::endl;
 				}
 				assert(0&&"No successor!");
@@ -319,6 +333,28 @@ void instErrPerc::processTestCase(bool const pass,std::vector<unsigned char> con
 			else{
 				visitedNodes.push_back(currNode);
 			}
+		}
+		// For switch inst, we might have multiple successors.
+		if(currNode->getBB()->getTerminator()->getOpcode() == llvm::Instruction::Switch){
+			if(i + sizeof(int) > concreteBranches.size()){
+				assert(0&&"Switch Index not recorded correctly");
+			}
+			//FIXME: Need to get four bytes, actually, should get sizeof int bytes.
+			char switchIndex[4];
+			switchIndex[0]= concreteBranches[i];
+			switchIndex[1]= concreteBranches[i+1];
+			switchIndex[2]= concreteBranches[i+2];
+			switchIndex[3]= concreteBranches[i+3];
+			int * index_ptr = (int*) switchIndex;
+			int index = *index_ptr;
+			if(index >= currNode->getSuccessor().size()){
+				assert(0&&"Switch successor out of index!");
+			}
+			currNode = currNode->getSuccessor()[index];
+			i += (sizeof(int) - 1);// i is incremented because we don't consider switch as real branch, however we have
+			//used space in the vector, so we need to pop it off.
+			fcallIt = currNode->getFcall().begin();
+			continue;
 		}
 		if(concreteBranches[i] == '0'){//if it is 0 then we follow the false branch, which is 1.
 			currNode = currNode->getSuccessor()[1];

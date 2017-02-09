@@ -22,7 +22,7 @@
 
 class errPercNode{
 private:
-	llvm::BasicBlock* BB;
+	const llvm::BasicBlock* BB;
 	std::vector<errPercNode*> successors;
 	std::vector<errPercNode*> fCalls;
 	int visited;
@@ -30,17 +30,17 @@ private:
 	int errorVisit;
 	bool isBR;
 	double hue;
-	std::map<llvm::BasicBlock*, unsigned int> blockFail;
+	std::map<const llvm::BasicBlock*, unsigned int> blockFail;
 	std::pair<errPercNode*, std::vector<errPercNode*>::iterator> retLoc;
 public:
 	errPercNode():BB(0),visited(0),correctVisit(0),errorVisit(0),isBR(false),hue(0.0){
 
 	}
-	errPercNode(llvm::BasicBlock* const _BB):BB(_BB),visited(0),correctVisit(0),errorVisit(0),isBR(false),hue(0.0){
+	errPercNode(const llvm::BasicBlock* _BB):BB(_BB),visited(0),correctVisit(0),errorVisit(0),isBR(false),hue(0.0){
 
 	}
 
-	llvm::BasicBlock* getBB(){
+	const llvm::BasicBlock* getBB(){
 		return BB;
 	}
 
@@ -109,7 +109,7 @@ public:
 		return retLoc;
 	}
 
-	void setBlockFail(llvm::BasicBlock* block);
+	void setBlockFail(const llvm::BasicBlock* block);
 
 	void calc_hue(unsigned int const totalpassed, unsigned int const totalfailed){
 		if((correctVisit + errorVisit) == 0){
@@ -139,19 +139,19 @@ private:
 	instErrPerc():root(NULL),totalpassed(0),totalfailed(0),id(-1){
 	}
 
-	errPercNode* find_Block_Rec(errPercNode* curr, llvm::BasicBlock* const target, int __id);
+	errPercNode* find_Block_Rec(errPercNode* curr, const llvm::BasicBlock* target, int __id);
 
-	errPercNode* find_Block(llvm::BasicBlock* const target){
+	errPercNode* find_Block(const llvm::BasicBlock* target){
 		errPercNode* ret = find_Block_Rec(root, target,id);
 		id--;
 		return ret;
 	}
 
-	errPercNode* insertSuccNode(errPercNode* parent, llvm::BasicBlock* succ);
+	errPercNode* insertSuccNode(errPercNode* parent, const llvm::BasicBlock* succ);
 
-	errPercNode* insertFcallNode(errPercNode* parent, llvm::BasicBlock* succ);
+	errPercNode* insertFcallNode(errPercNode* parent, const llvm::BasicBlock* succ);
 
-	llvm::Function* getTargetFunction(llvm::Value *calledVal);
+	const llvm::Function* getTargetFunction(const llvm::Value *calledVal);
 
 	void init();
 

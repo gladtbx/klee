@@ -119,7 +119,6 @@ void TreeStreamWriter::readStream(TreeStreamID streamID,
                                   std::vector<unsigned char> &out) {
   assert(streamID>0 && streamID<ids);
   flush();
-  
   std::ifstream is(path.c_str(),
                    std::ios::in | std::ios::binary);
   assert(is.good());
@@ -169,12 +168,15 @@ void TreeStreamWriter::readStream(TreeStreamID streamID,
     if (!is.good()) break;
     if (tag&(1<<31)) { // fork
       unsigned child = tag ^ (1<<31);
-      if (id==roots.back() && roots.size()>1 && child==roots[roots.size()-2])
-        roots.pop_back();
+      if (id==roots.back() && roots.size()>1 && child==roots[roots.size()-2]){
+    	  roots.pop_back();
+      }
     } else {
       unsigned size = tag;
       if (id==roots.back()) {
-        while (size--) out.push_back(is.get());
+        while (size--) {
+        	out.push_back(is.get());
+        }
       } else {
         while (size--) is.get();
       }
@@ -210,6 +212,12 @@ void TreeOStream::write(const char *buffer, unsigned size) {
 TreeOStream &TreeOStream::operator<<(const std::string &s) {
   assert(writer);
   write(s.c_str(), s.size());
+  return *this;
+}
+
+TreeOStream &TreeOStream::operator<<(const int &s) {
+  assert(writer);
+  write((char*)&s, sizeof(int));
   return *this;
 }
 
