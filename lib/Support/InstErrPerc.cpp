@@ -23,12 +23,12 @@ bool suspiciousCmp(const std::pair<double,errPercNode*> & first, const std::pair
 void instErrPerc::calcHue(std::string outFileName){
 	std::ofstream hueOutputFile;
 	std::ofstream gdbOutputFile;
+	hueOutputFile.open(outFileName.c_str(),std::ofstream::out);
+
 	gdbOutputFile.open(outFileName.insert(outFileName.find_last_of('/')+1,"gdb").c_str(),std::ofstream::out);
 	if(!gdbOutputFile){
 		klee::klee_error("Failed to open gdbSuspicious.txt");
 	}
-
-	hueOutputFile.open(outFileName.c_str(),std::ofstream::out);
 
 	if(!hueOutputFile){
 		klee::klee_error("Failed to open suspiciousInstList.txt");
