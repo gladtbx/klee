@@ -3,7 +3,6 @@ Release+Asserts/
 Debug/
 Debug+Asserts/
 Output/
-
 cscope.*
 *~
 
@@ -20,6 +19,7 @@ include/klee/Config/CompileTimeInfo.h
 config.h
 site.exp
 
+.cproject
 # Site file for llvm-lit
 lit.site.cfg
 
