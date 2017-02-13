@@ -1133,7 +1133,7 @@ static char *format_tdiff(char *buf, long seconds)
   return buf;
 }
 
-#ifndef SUPPORT_KLEE_UCLIBC
+#ifdef SUPPORT_KLEE_UCLIBC
 static llvm::Module *linkWithUclibc(llvm::Module *mainModule, StringRef libDir) {
   klee_error("invalid libc, no uclibc support!\n");
 }
