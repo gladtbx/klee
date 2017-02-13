@@ -1584,7 +1584,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
       ConstantInt *ci = ConstantInt::get(Ty, CE->getZExtValue());
       unsigned index = si->findCaseValue(ci).getSuccessorIndex();
       transferToBasicBlock(si->getSuccessor(index), si->getParent(), state);
-      state.pathOS << index;
+      if(pathWriter){
+    	  state.pathOS << index;
+      }
     } else {
       // Handle possible different branch targets
 
@@ -1689,8 +1691,10 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
                                                ie = bbOrder.end();
            it != ie; ++it) {
         ExecutionState *es = *bit;
-        es->pathOS = pathWriter->open(state.pathOS);
-        es->pathOS << branchTargets[*it].second;
+        if(pathWriter){
+        	es->pathOS = pathWriter->open(state.pathOS);
+   	        es->pathOS << branchTargets[*it].second;
+        }
         if (es)
           transferToBasicBlock(*it, bb, *es);
         ++bit;
