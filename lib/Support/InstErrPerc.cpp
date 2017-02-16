@@ -1,4 +1,6 @@
 #include "klee/util/InstErrPerc.h"
+#include "klee/util/errPercNode.h"
+
 using namespace llvm;
 
 void errPercNode::setBlockFail(const llvm::BasicBlock* block){
@@ -131,7 +133,7 @@ errPercNode* instErrPerc::find_Block_Rec(errPercNode* curr, const llvm::BasicBlo
 			}
 		}
 	}
-	if(!ret){
+	if(!ret){//If we don't find target node as successors, we look for the target node in function calls
 		const std::vector<errPercNode*> fcalls = curr->getFcall();
 		for(unsigned j = 0; j < fcalls.size(); j++){
 			if(fcalls[j]->get_visited()!=-1){
@@ -148,11 +150,16 @@ errPercNode* instErrPerc::find_Block_Rec(errPercNode* curr, const llvm::BasicBlo
 errPercNode* instErrPerc::insertSuccNode(errPercNode* parent, const llvm::BasicBlock* succ){
 	errPercNode* nextNode = find_Block(succ);//we have to use findBlock because we can not mark the llvm Basic Block directly.
 	if(nextNode == NULL){
-		errPercNode* succ_node = new errPercNode(succ);
+		errPercNode* succ_node = new errPercNode(succ,tarjanid);
+		tarjanid++;
+		std::cout<< tarjanid << " " << parent << " having child " << succ_node << std::endl;
+
 		parent->insertSuccessor(succ_node);
 		return succ_node;
 	}
 	else{//otherwise we need to point back
+		std::cout<< parent << " having child " << nextNode << std::endl;
+
 		parent->insertSuccessor(nextNode);
 	}
 	return NULL;
@@ -161,7 +168,8 @@ errPercNode* instErrPerc::insertSuccNode(errPercNode* parent, const llvm::BasicB
 errPercNode* instErrPerc::insertFcallNode(errPercNode* parent, const llvm::BasicBlock* succ){
 	errPercNode* nextNode = find_Block(succ);//we have to use findBlock because we can not mark the llvm Basic Block directly.
 	if(nextNode == NULL){
-		errPercNode* succ_node = new errPercNode(succ);
+		errPercNode* succ_node = new errPercNode(succ,tarjanid);
+		tarjanid++;
 		parent->insertFcall(succ_node);
 		return succ_node;
 	}
