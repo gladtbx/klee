@@ -11,6 +11,9 @@
  * It is then used by Johnson's algorithm to find all circuits.
  * Each circuit is a potential loop for the program.
  * The loop info is then used to reduce the path info, as well as reduce the execution space we need to explore.
+ * Usage: after constructing, use init to initialize the DG.
+ * Before each calculation of new partition, use clearPartition to clear out the labels, and then use SCC() to calculate
+ * new partation.
  */
 template<class DAT>
 class Graph
@@ -26,6 +29,7 @@ private:
 	std::stack<int> *st;
 	std::vector<std::set<std::pair<int,DAT*> > > partition;
 	int time;
+	int current_s;
 
 
 	int min(int a, int b){
@@ -70,7 +74,7 @@ private:
 public:
 	Graph(int _V, DAT* _root):root(_root),V(_V),
 	nil(NULL),disc(NULL),low(NULL),stackMember(new bool[V]),
-	st(new std::stack<int>()),time(0){
+	st(new std::stack<int>()),time(0),current_s(-1){
 		nodes = (DAT**) malloc(V*sizeof(DAT*));
 		disc = (int*) malloc(V*sizeof(int));
 		low = (int*) malloc(V*sizeof(int));
@@ -122,6 +126,7 @@ public:
 
 	void SCC(){
 		time = 0;
+		current_s = 0;
 		for(int i = 0; i < V; i++){
 			if(disc[i] == -1){
 				SCCUtil(i);
@@ -132,6 +137,7 @@ public:
 
 	void SCC(int u){
 		time = 0;
+		current_s = u;
 		for(int i = 0; i < V; i++){
 			if(i < u){
 				disc[i] = 1;
@@ -142,6 +148,10 @@ public:
 			}
 		}
 		return;
+	}
+
+	int get_current_s(){
+		return current_s;
 	}
 
 	void clearPartition(){
