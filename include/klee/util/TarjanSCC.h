@@ -158,16 +158,25 @@ public:
 		for(typename std::vector<std::set<std::pair<int,DAT*> > >::iterator i = partition.begin(); i != partition.end(); i++){
 			i->clear();
 		}
+		partition.clear();
 		for(int i = 0; i < V; i++){
 			disc[i] = -1;
 			low[i] = -1;
 			stackMember[i] = false;
-			nodes[i] = NULL;
 		}
 	}
 
 	std::vector<std::set<std::pair<int,DAT*> > >& getPartition(){
 		return partition;
+	}
+
+	void print(){
+		for(std::vector<std::set<std::pair<int,errPercNode*> > >::iterator i = partition.begin(); i != partition.end(); i++){
+			for(std::set<std::pair<int,errPercNode*> >::iterator j = i->begin(); j != i->end(); j++){
+				std::cout<< j->first << ",";
+			}
+			std::cout<< std::endl;
+		}
 	}
 };
 #endif

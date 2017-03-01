@@ -12,7 +12,7 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/DebugInfo.h"
 #include "klee/Internal/Support/ErrorHandling.h"
-#include "klee/util/TarjanSCC.h"
+#include "klee/util/DonaldBJohnsonCircuitAlg.h"
 #include "klee/util/errPercNode.h"
 #include <iostream>
 #include <fstream>
@@ -25,7 +25,7 @@
 class instErrPerc{
 private:
 	errPercNode* root;
-	instErrPerc():root(NULL),totalpassed(0),totalfailed(0),id(-1),tarjanid(0),graph(NULL){
+	instErrPerc():root(NULL),totalpassed(0),totalfailed(0),id(-1),tarjanid(0),dbj(NULL){
 	}
 
 	errPercNode* find_Block_Rec(errPercNode* curr, const llvm::BasicBlock* target, int __id);
@@ -50,7 +50,7 @@ private:
 	int id;
 	int tarjanid;
 	std::string tab;
-	Graph<errPercNode>* graph;
+	dbjCircuit<errPercNode>* dbj;
 public:
 	instErrPerc(errPercNode* &_root){
 		root = _root;
@@ -59,9 +59,7 @@ public:
 		id = -1;
 		tarjanid = 0;
 		init();
-		graph = new Graph<errPercNode>(tarjanid,root);
-		graph->init();
-		graph->SCC();
+		dbj = new dbjCircuit<errPercNode>(tarjanid,root);
 	}
 
 	instErrPerc(llvm::BasicBlock* const BB){
@@ -71,16 +69,9 @@ public:
 		totalfailed = 0;
 		id = -1;
 		init();
-		graph = new Graph<errPercNode>(tarjanid,root);
-		graph->init();
-		graph->SCC(40);
-		std::vector<std::set<std::pair<int,errPercNode*> > > partition = graph->getPartition();
-		for(std::vector<std::set<std::pair<int,errPercNode*> > >::iterator i = partition.begin(); i != partition.end(); i++){
-			for(std::set<std::pair<int,errPercNode*> >::iterator j = i->begin(); j != i->end(); j++){
-				std::cout<< j->first << ",";
-			}
-			std::cout<< std::endl;
-		}
+		dbj = new dbjCircuit<errPercNode>(tarjanid,root);
+		dbj->genCircuit();
+		dbj->printCycle();
 	}
 
 	void processTestCase(bool const pass,std::vector<unsigned char> const &concreteBranches, int const id);
