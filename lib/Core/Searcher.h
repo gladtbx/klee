@@ -76,7 +76,8 @@ namespace klee {
       NURS_Depth,
       NURS_ICnt,
       NURS_CPICnt,
-      NURS_QC
+      NURS_QC,
+      LoopReduction
     };
   };
 
@@ -297,6 +298,26 @@ namespace klee {
         (*it)->printName(os);
       os << "</InterleavedSearcher>\n";
     }
+  };
+
+  class LoopReductionSearcher : public Searcher{
+	  std::vector<ExecutionState*> states;
+	  std::vector<ExecutionState*> blocked_states;
+	  ExecutionState* next_state;
+	  bool allCovered();
+      Executor &executor;
+  public:
+     LoopReductionSearcher(Executor &_executor):next_state(NULL),executor(_executor){
+
+     }
+     ExecutionState &selectState();
+     void update(ExecutionState *current,
+                 const std::vector<ExecutionState *> &addedStates,
+                 const std::vector<ExecutionState *> &removedStates);
+     bool empty();
+     void printName(llvm::raw_ostream &os) {
+       os << "LoopReductionSearcher\n";
+     }
   };
 
 }

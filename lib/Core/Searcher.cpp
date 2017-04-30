@@ -647,3 +647,69 @@ void InterleavedSearcher::update(
          ie = searchers.end(); it != ie; ++it)
     (*it)->update(current, addedStates, removedStates);
 }
+
+bool LoopReductionSearcher::allCovered(){
+	return executor.allCovered();
+}
+
+bool LoopReductionSearcher::empty(){
+	if(!states.empty())
+		return false;
+	if(blocked_states.size()){
+			return allCovered();
+/*			for(std::vector<ExecutionState*>::reverse_iterator block_it = blocked_states.rbegin(),
+					block_itEnd = blocked_states.rend(); block_it != block_itEnd; block_it++){
+				if(!allCovered(*block_it)){
+					next_state = *block_it;
+					return false;
+				}
+			}
+*/
+	}
+	return true;
+}
+
+ExecutionState &LoopReductionSearcher::selectState(){
+	if(states.size()){
+		return *states.back();
+	}
+	if(blocked_states.size()){
+		std::cout<<"loopPath size: " << blocked_states.size() << std::endl;
+		return *blocked_states.back();
+		//return *next_state;
+	}
+	klee_error("No more states to explore.");
+}
+
+void LoopReductionSearcher::update(ExecutionState *current,
+                 const std::vector<ExecutionState *> &addedStates,
+                 const std::vector<ExecutionState *> &removedStates){
+	for(std::vector<ExecutionState*>::const_iterator addedIt = addedStates.begin(),
+			addedItEnd = addedStates.end(); addedIt != addedItEnd; addedIt++){
+		if((*addedIt)->stack.back().loopPath.size()){
+			loopPathInfo* currLoop = &((*addedIt)->stack.back().loopPath.back());
+			//We check the number of uncovered path for the current loop. It there is none, we put the state in blocked queue.
+			if(currLoop->uncoveredPaths->second.empty()){
+				blocked_states.push_back((*addedIt));
+				continue;
+			}
+		}
+		states.push_back((*addedIt));
+	}
+	for(std::vector<ExecutionState*>::const_iterator removedIt = removedStates.begin(),
+			removedItEnd = removedStates.end(); removedIt != removedItEnd; removedIt++){
+		std::vector<ExecutionState*>::iterator removedState = std::find(states.begin(),states.end(),*removedIt);
+		if( removedState!= states.end()){
+			states.erase(removedState);
+		}
+		else{
+			removedState = std::find(blocked_states.begin(),blocked_states.end(),*removedIt);
+			if(removedState != blocked_states.end()){
+				blocked_states.erase(removedState);
+			}
+			else{
+				assert(0&&"invalid state removed");
+			}
+		}
+	}
+}

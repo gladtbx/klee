@@ -14,7 +14,8 @@ private:
 	Graph<DAT>* graph;
 	DAT* root;
 	std::vector<std::vector<int> > cycles;
-	dbjCircuit():n(0),s(0),graph(NULL),root(NULL){
+	std::vector<DAT*> tarjanNodes;
+	dbjCircuit():n(0),s(0),graph(NULL),root(NULL),tarjanNodes(){
 
 	}
 
@@ -42,10 +43,10 @@ private:
 		stack.push_back(v);
 		blocked[v]=true;
 		std::pair<int, DAT*> Akv;
-		for(typename std::set<std::pair<int,DAT*> >::iterator i = A.begin(); i != A.end(); i++){
-			if(i->first == v){//finding Ak[v]
-				Akv = *i;
-				for(typename std::vector<DAT*>::const_iterator j = i->second->getSuccessor().begin(); j != i->second->getSuccessor().end() ; j++ ){
+		//for(typename std::set<std::pair<int,DAT*> >::iterator i = A.begin(); i != A.end(); i++){
+		//	if(i->first == v){//finding Ak[v]
+				Akv = std::make_pair(v,tarjanNodes[v]);
+				for(typename std::vector<DAT*>::const_iterator j = tarjanNodes[v]->getSuccessor().begin(); j != tarjanNodes[v]->getSuccessor().end() ; j++ ){
 				//for w in Ak(v)
 					int w = (*j)->get_tarjanid();
 					if(A.find(std::make_pair(w,(*j))) != A.end()){
@@ -64,9 +65,9 @@ private:
 						}
 					}
 				}
-				break;
-			}
-		}
+				//break;
+			//}
+		//}
 		if(f){
 			Unblock(v);
 		}
@@ -80,7 +81,7 @@ private:
 		return f;
 	}
 public:
-	dbjCircuit(int _n, DAT* _root):n(_n),B(std::vector<std::set<int> >(_n)),blocked(std::vector<bool>(_n)),s(0),root(_root){
+	dbjCircuit(int _n, DAT* _root, const std::vector<DAT*> &_tarjanNodes):n(_n),B(std::vector<std::set<int> >(_n)),blocked(std::vector<bool>(_n)),s(0),root(_root),tarjanNodes(_tarjanNodes){
 		graph = new Graph<DAT>(n,root);
 		graph->init();
 	}
@@ -153,6 +154,10 @@ public:
 			}
 			std::cout<<std::endl;
 		}
+	}
+
+	const std::vector<std::vector<int> > &getCycles(){
+		return cycles;
 	}
 };
 

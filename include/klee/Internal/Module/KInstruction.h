@@ -12,6 +12,7 @@
 
 #include "klee/Config/Version.h"
 #include "llvm/Support/DataTypes.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include <vector>
 
 namespace llvm {
@@ -29,7 +30,7 @@ namespace klee {
   struct KInstruction {
     llvm::Instruction *inst;    
     const InstructionInfo *info;
-
+    llvm::Loop *loop=0;
     /// Value numbers for each operand. -1 is an invalid value,
     /// otherwise negative numbers are indices (negated and offset by
     /// 2) into the module constant table and positive numbers are

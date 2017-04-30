@@ -12,6 +12,7 @@
 
 #include "klee/Config/Version.h"
 #include "klee/Interpreter.h"
+#include "klee/util/InstErrPerc.h"
 
 #include <map>
 #include <set>
@@ -112,6 +113,8 @@ namespace klee {
 
     // Functions which are part of KLEE runtime
     std::set<const llvm::Function*> internalFunctions;
+
+    std::map<const llvm::Function*,std::vector<const llvm::BasicBlock*> > unvisitedBlocks;
 
   private:
     // Mark function with functionName as part of the KLEE runtime
