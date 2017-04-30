@@ -267,6 +267,8 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
   pm3.add(new IntrinsicCleanerPass(*targetData));
   pm3.add(new PhiCleanerPass());
   pm3.add(operandTypeCheckPass);
+  //Add dead code elimination pass
+  pm3.add(createDeadInstEliminationPass());
   pm3.run(*module);
 
   // Enforce the operand type invariants that the Executor expects.  This
@@ -339,6 +341,33 @@ void KModule::prepare(const Interpreter::ModuleOptions &opts,
 
     functions.push_back(kf);
     functionMap.insert(std::make_pair(fn, kf));
+  }
+
+  //Gladtbx: We should add the block coverage information here
+  std::vector<const llvm::Function*> unvisitedFuncs;
+  unvisitedFuncs.push_back(module->getFunction("main"));
+  //unvistedBlocks.insert(std::make_pair(it,std::vector<BasicBlock*>()));
+  const llvm::Function* visitingFunc;
+  while(unvisitedFuncs.size()){
+	  visitingFunc = unvisitedFuncs.back();
+	  unvisitedFuncs.pop_back();
+	  for(Function::const_iterator funcIt = visitingFunc->begin(), funcIe = visitingFunc->end(); funcIt != funcIe; funcIt++){
+		  unvisitedBlocks[visitingFunc].push_back(funcIt);
+		  for(BasicBlock::const_iterator BBit = funcIt->begin(), BBie = funcIt->end(); BBit != BBie; BBit++){
+			  if(BBit->getOpcode() == llvm::Instruction::Call){
+				  const llvm::CallInst* callInst = cast<CallInst>(BBit);
+				  const llvm::Value* targetValue = callInst->getCalledValue();
+				  const llvm::Function* targetFunc = instErrPerc::getTargetFunction(targetValue);
+				  if(targetFunc && ! targetFunc->isDeclaration()){
+					  if(targetFunc->begin() != targetFunc->end()){
+						  if(unvisitedBlocks.find(targetFunc) == unvisitedBlocks.end()){
+							  unvisitedFuncs.push_back(targetFunc);//If the called node hasn't been explored before, we need to add it to the worklist.
+						  }
+					  }
+				  }
+			  }
+		  }
+	  }
   }
 
   /* Compute various interesting properties */
@@ -488,3 +517,5 @@ KFunction::~KFunction() {
     delete instructions[i];
   delete[] instructions;
 }
+
+

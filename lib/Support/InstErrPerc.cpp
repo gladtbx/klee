@@ -150,9 +150,9 @@ errPercNode* instErrPerc::find_Block_Rec(errPercNode* curr, const llvm::BasicBlo
 errPercNode* instErrPerc::insertSuccNode(errPercNode* parent, const llvm::BasicBlock* succ){
 	errPercNode* nextNode = find_Block(succ);//we have to use findBlock because we can not mark the llvm Basic Block directly.
 	if(nextNode == NULL){
-		errPercNode* succ_node = new errPercNode(succ,tarjanid);
-		tarjanid++;
-		std::cout<< tarjanid << " " << parent << " having child " << succ_node << std::endl;
+		errPercNode* succ_node = new errPercNode(succ,tarjanNodes.size());
+		tarjanNodes.push_back(succ_node);
+		std::cout<< tarjanNodes.size() - 1 << " " << parent << " having child " << succ_node << std::endl;
 
 		parent->insertSuccessor(succ_node);
 		return succ_node;
@@ -168,8 +168,8 @@ errPercNode* instErrPerc::insertSuccNode(errPercNode* parent, const llvm::BasicB
 errPercNode* instErrPerc::insertFcallNode(errPercNode* parent, const llvm::BasicBlock* succ){
 	errPercNode* nextNode = find_Block(succ);//we have to use findBlock because we can not mark the llvm Basic Block directly.
 	if(nextNode == NULL){
-		errPercNode* succ_node = new errPercNode(succ,tarjanid);
-		tarjanid++;
+		errPercNode* succ_node = new errPercNode(succ,tarjanNodes.size());
+		tarjanNodes.push_back(succ_node);
 		parent->insertFcall(succ_node);
 		return succ_node;
 	}
@@ -225,7 +225,6 @@ void instErrPerc::init(){
 				const llvm::CallInst* callInst = cast<CallInst>(it);
 				const llvm::Value* targetValue = callInst->getCalledValue();
 				const llvm::Function* targetFunc = getTargetFunction(targetValue);
-				if(targetFunc)
 				if(targetFunc && ! targetFunc->isDeclaration()){
 					if(targetFunc->begin() != targetFunc->end()){
 						errPercNode* calledNode = insertFcallNode(current,&(targetFunc->getEntryBlock()));

@@ -22,6 +22,7 @@
 #include "klee/Internal/Module/KModule.h"
 #include "klee/util/ArrayCache.h"
 #include "llvm/Support/raw_ostream.h"
+#include "klee/util/Loops.h"
 
 #include "llvm/ADT/Twine.h"
 
@@ -214,6 +215,10 @@ private:
 
   // @brief buffer to store logs before flushing to file
   llvm::raw_string_ostream debugLogBuffer;
+
+  std::map<llvm::Loop*,std::vector<std::vector<llvm::BasicBlock*> > > loopPathsH2H;
+  std::map<llvm::Loop*, std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > > > loopPathsH2E;
+  std::vector<llvm::Loop*> uncoveredloops;
 
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
                                     ExecutionState &state);
@@ -476,6 +481,7 @@ private:
 
   std::string getPathInfo(const ExecutionState &state, bool trueBranch);
 
+  void processLoopInfo(llvm::BasicBlock* root);
 
 public:
   Executor(llvm::LLVMContext &ctx, const InterpreterOptions &opts,
@@ -550,6 +556,9 @@ public:
 
   Expr::Width getWidthForLLVMType(llvm::Type *type) const;
   size_t getAllocationAlignment(const llvm::Value *allocSite) const;
+//  Expr::Width getWidthForLLVMType(LLVM_TYPE_Q llvm::Type *type) const;
+
+  bool allCovered();
 };
   
 } // End klee namespace

@@ -12,6 +12,7 @@
 
 #include "klee/Constraints.h"
 #include "klee/Expr.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "klee/Internal/ADT/TreeStream.h"
 #include "klee/MergeHandler.h"
 
@@ -35,10 +36,25 @@ struct InstructionInfo;
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const MemoryMap &mm);
 
+struct loopPathInfo{
+	llvm::Loop* loop;
+	std::vector<llvm::BasicBlock*> path;
+	std::pair<unsigned, std::vector<std::vector<llvm::BasicBlock*> > > *uncoveredPaths;
+	loopPathInfo():loop(NULL),uncoveredPaths(NULL){
+	}
+	loopPathInfo(const loopPathInfo &_rhs):loop(_rhs.loop),path(_rhs.path),uncoveredPaths(_rhs.uncoveredPaths){
+		uncoveredPaths->first++;
+	}
+};
+
 struct StackFrame {
   KInstIterator caller;
   KFunction *kf;
   CallPathNode *callPathNode;
+
+  //So we need a stack for loop info
+  //the stack consists of the current loop*, path from loop head until now, and ptr to shared path cov info.
+  std::vector<loopPathInfo> loopPath;
 
   std::vector<const MemoryObject *> allocas;
   Cell *locals;
@@ -73,6 +89,20 @@ private:
   std::map<std::string, std::string> fnAliases;
 
   int FscanfBytesRead;
+
+  //Need a stack of loop info holder.
+  //The loop info holder should be accessible to all the states that are trying to cover the same loop.
+  //It should be a list of uncovered paths.
+  //Each time we cover one of the paths, we eliminate that path from the vector.
+  //Each time we are in a new loop, the information about previous unfinished loop should be pushed onto the stack.
+  //Each time when we exit from a loop, the info should be popped off the stack.
+  //So each state should record the path from the head until the current state, and when there is a choice between two paths,
+  //pick the one that is not explored yet. If both have yet been explored, fork.
+  //If both have been explored, FIXME: don't fork.
+
+  //Each state should also take note about the current path taken inside the loop.
+  //Or when we hit the head of a loop, we fork into N states, where each N is a different path from the entry
+  //point to exit? No, we should not use this method.
 
 public:
   // Execution - Control Flow specific

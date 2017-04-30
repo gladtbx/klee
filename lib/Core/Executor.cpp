@@ -300,6 +300,11 @@ namespace {
   MaxMemoryInhibit("max-memory-inhibit",
             cl::desc("Inhibit forking at memory cap (vs. random terminate) (default=on)"),
             cl::init(true));
+
+  cl::opt<bool>
+  LoopReduction("loop-reduction",
+		  cl::desc("Apply loop reduction, reduce number of states forked inside loops."),
+		  cl::init(false));
 }
 
 
@@ -925,6 +930,23 @@ Executor::fork(ExecutionState &current, ref<Expr> condition, bool isInternal) {
 
     return StatePair(0, &current);
   } else {
+	  //FIXME:Add state search selection, and then we don't need this part.
+	/*
+	if(LoopReduction){
+		std::vector<loopPathInfo> *loopPath = &current.stack.back().loopPath;
+		if(loopPath->size()){
+			if(!loopPath->back().uncoveredPaths->second.size()){
+				//We are in a loop, and there is no uncoveredPaths
+				//FIXME: More needs to be done.
+				if (!isInternal) {
+				      if (pathWriter) {
+				    	  current.pathOS << "0";
+				      }
+			    }
+			    return StatePair(0, &current);
+			}
+		}
+	}*/
     TimerStatIncrementer timer(stats::forkTime);
     ExecutionState *falseState, *trueState = &current;
 
@@ -1479,6 +1501,149 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
+  //Add loop head info to ki, so we don't need to search for loop each time.
+  if(LoopReduction){
+	  //We only do process at the beginning of a block.
+	  llvm::BasicBlock* kblock = ki->inst->getParent();
+	  if(ki->inst==kblock->begin()){
+		  //We need to check if the block has been hit before, if not so , we need to remove it from the unvisited block list.
+		  llvm::Function* kfunction = kblock->getParent();
+		  if(kmodule->unvisitedBlocks[kfunction].size()){
+			  std::vector<const llvm::BasicBlock*>::iterator unvisitedBlock = std::find(kmodule->unvisitedBlocks[kfunction].begin(),
+					  kmodule->unvisitedBlocks[kfunction].end(),kblock);
+			  if(unvisitedBlock != kmodule->unvisitedBlocks[kfunction].end()){
+				  kmodule->unvisitedBlocks[kfunction].erase(unvisitedBlock);
+			  }
+		  }
+		  if(state.stack.back().loopPath.size()){
+			  std::cout<< "Currently at block:" << ki->inst->getParent()<<std::endl;
+			  //If we are currently in a loop.
+			  //We should check if the current inst is one of the exits.
+			  //If yes, we need to mark one of the path being explored.
+			  //And reduce the number of reference by one.
+			  //If no, we need to record the path.
+			  loopPathInfo* currLoop = &state.stack.back().loopPath.back();
+			  SmallVector<llvm::BasicBlock*,8> exitBlocks;
+			  currLoop->loop->getExitBlocks(exitBlocks);
+			  if(std::find(exitBlocks.begin(),exitBlocks.end(),ki->inst->getParent()) != exitBlocks.end()){
+				  //We should check if current path H2E has been covered.
+				  std::vector<std::vector<llvm::BasicBlock*> >* uncoveredPaths = &currLoop->uncoveredPaths->second;
+				  currLoop->path.push_back(ki->inst->getParent());
+				  for(std::vector<std::vector<llvm::BasicBlock*> >::iterator uncoveredPath = uncoveredPaths->begin(),
+						  uncoveredPathEnd = uncoveredPaths->end(); uncoveredPath != uncoveredPathEnd; uncoveredPath++){
+					  if(*uncoveredPath == currLoop->path){
+						  //Our path is a match of the uncovered path.
+						  uncoveredPaths->erase(uncoveredPath);
+						  //We need to check if we have hit every possible path of the loop.
+						  //If so, wee need to remove the loop from the list of uncovered loop.
+						  if(uncoveredPaths->empty()){
+							  std::vector<llvm::Loop*>::iterator uncoveredloop
+							  	  = std::find(uncoveredloops.begin(),uncoveredloops.end(),currLoop->loop);
+							  if(uncoveredloop != uncoveredloops.end()){
+								  uncoveredloops.erase(uncoveredloop);
+							  }
+						  }
+						  break;
+					  }
+				  }
+				  //if we hit an exit block.
+				  //We need to pop off the loop info.
+				  //Then we need to reduce the number of reference
+				  if((--(currLoop->uncoveredPaths->first))==0){
+					  free(currLoop->uncoveredPaths);
+				  }
+				  //Pop the current loop info off the stack.
+				  state.stack.back().loopPath.pop_back();
+			  }
+			  else{
+				  //if the block we are at is not at the exit of the loop.
+				  currLoop->path.push_back(ki->inst->getParent());
+			  }
+		  }
+		  //If the inst is the head of a loop. As long as the loop is not what we have already been inside, we push the new
+		  //loop info onto the stack.
+		  if(ki->loop){
+			  //If we are still in a loop.
+			  //FIXME: logic can be simplified.
+			  if(state.stack.back().loopPath.size()){
+				  loopPathInfo* currLoop = &state.stack.back().loopPath.back();
+				  //If we hit the head again.
+				  if(currLoop->loop == ki->loop){
+					  //We should record the path explored by erasing the record path from uncovered paths.
+					  std::cout<< "		CurrentPath: ";
+					  for(std::vector<llvm::BasicBlock*>::iterator BBit = currLoop->path.begin(),
+							BBitEnd = currLoop->path.end(); BBit != BBitEnd; BBit++){
+						  std::cout<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
+					  }
+					  std::cout<< std::endl;
+					  std::vector<std::vector<llvm::BasicBlock*> >* uncoveredPaths = &currLoop->uncoveredPaths->second;
+
+/*					  std::cout<<"			Uncovered Paths:" << std::endl;
+					  for(std::vector<std::vector<llvm::BasicBlock*> >::iterator path = uncoveredPaths->begin(),
+							pathEnd = uncoveredPaths->end(); path != pathEnd; path++){
+							std::cout<<"	";
+							for(std::vector<llvm::BasicBlock*>::iterator BBit = path->begin(),
+									BBitEnd = path->end(); BBit != BBitEnd; BBit++){
+								std::cout<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
+							}
+							std::cout<<std::endl;
+					  }
+*/
+					  for(std::vector<std::vector<llvm::BasicBlock*> >::iterator uncoveredPath = uncoveredPaths->begin(),
+							  uncoveredPathEnd = uncoveredPaths->end(); uncoveredPath != uncoveredPathEnd; uncoveredPath++){
+						  if(*uncoveredPath == currLoop->path){
+							  //Our path is a match of the uncovered path.
+							  uncoveredPaths->erase(uncoveredPath);
+							  //std::cout<<"	Erased path!"<< std::endl;
+							  //We need to check if we have hit every possible path of the loop.
+							  //If so, wee need to remove the loop from the list of uncovered loop.
+							  if(uncoveredPaths->empty()){
+								  std::vector<llvm::Loop*>::iterator uncoveredloop
+									  = std::find(uncoveredloops.begin(),uncoveredloops.end(),currLoop->loop);
+								  if(uncoveredloop != uncoveredloops.end()){
+									  uncoveredloops.erase(uncoveredloop);
+								  }
+							  }
+							  break;
+						  }
+					  }
+					  //We should reset the path info.
+					  currLoop->path.clear();
+				  }
+				  else{
+					  //We are now in a new subloop
+					  std::cout<<"Entering SubLoop:" << ki->loop<< std::endl;
+					  loopPathInfo loopInfo;
+					  loopInfo.loop = ki->loop;
+					  loopInfo.uncoveredPaths = new std::pair<unsigned, std::vector<std::vector<llvm::BasicBlock*> > >;
+					  loopInfo.uncoveredPaths->first = 1;
+					  loopInfo.uncoveredPaths->second = loopPathsH2H[loopInfo.loop];
+					  //We might need to reconsider how to deal with H2H and H2E;
+					  for(std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > >::const_iterator loopPathsH2Eit = loopPathsH2E[loopInfo.loop].begin(),
+							  loopPathsH2Eendit = loopPathsH2E[loopInfo.loop].end(); loopPathsH2Eit != loopPathsH2Eendit; loopPathsH2Eit++){
+						  loopInfo.uncoveredPaths->second.insert(loopInfo.uncoveredPaths->second.end(),loopPathsH2Eit->second.begin(),loopPathsH2Eit->second.end());
+					  }
+					  state.stack.back().loopPath.push_back(loopInfo);
+				  }
+			  }
+			  else{
+				  std::cout<<"Entering Loop:" << ki->loop<< std::endl;
+				  //If this is the first time we are in this loop
+				  loopPathInfo loopInfo;
+				  loopInfo.loop = ki->loop;
+				  loopInfo.uncoveredPaths = new std::pair<unsigned, std::vector<std::vector<llvm::BasicBlock*> > >;
+				  loopInfo.uncoveredPaths->first = 1;
+				  loopInfo.uncoveredPaths->second = loopPathsH2H[loopInfo.loop];
+				  //We might need to reconsider how to deal with H2H and H2E;
+				  for(std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > >::const_iterator loopPathsH2Eit = loopPathsH2E[loopInfo.loop].begin(),
+						  loopPathsH2Eendit = loopPathsH2E[loopInfo.loop].end(); loopPathsH2Eit != loopPathsH2Eendit; loopPathsH2Eit++){
+					  loopInfo.uncoveredPaths->second.insert(loopInfo.uncoveredPaths->second.end(),loopPathsH2Eit->second.begin(),loopPathsH2Eit->second.end());
+				  }
+				  state.stack.back().loopPath.push_back(loopInfo);
+			  }
+		  }
+	  }
+  }
   //i->getParent()->getParent()->dump();
   //i->dump();//Gladtbx:switch
   //klee_warning(i->getNameStr().c_str());
@@ -2743,6 +2908,9 @@ void Executor::run(ExecutionState &initialState) {
   searcher->update(0, newStates, std::vector<ExecutionState *>());
 
   while (!states.empty() && !haltExecution) {
+	if(LoopReduction && allCovered()){
+		break;
+	}
     ExecutionState &state = searcher->selectState();
     KInstruction *ki = state.pc;
     stepInstruction(state);
@@ -3579,6 +3747,8 @@ void Executor::runFunctionAsMain(Function *f,
   if (statsTracker)
     statsTracker->framePushed(*state, 0);
 
+  if(LoopReduction)
+	  processLoopInfo(&f->getEntryBlock());
   assert(arguments.size() == f->arg_size() && "wrong number of arguments");
   for (unsigned i = 0, e = f->arg_size(); i != e; ++i)
     bindArgument(kf, i, *state, arguments[i]);
@@ -3848,4 +4018,45 @@ void Executor::prepareForEarlyExit() {
 Interpreter *Interpreter::create(LLVMContext &ctx, const InterpreterOptions &opts,
                                  InterpreterHandler *ih) {
   return new Executor(ctx, opts, ih);
+}
+
+void Executor::processLoopInfo(llvm::BasicBlock* root){
+	klee::KLoops* kloops = new klee::KLoops(root);
+	kloops->printLoop();
+	kloops->genPath();
+	kloops->printPath();
+	const std::vector<llvm::Loop*> processedloops = kloops->getLoops();
+	KFunction* kf;
+	unsigned entry;
+	KInstruction* ki;
+	//Go through each loop, find the coresponding ki, and set the ki->loop.
+	for(std::vector<llvm::Loop*>::const_iterator loop=processedloops.begin(),
+			loopEnd = processedloops.end(); loop != loopEnd; loop++){
+		kf = kmodule->functionMap[(*loop)->getHeader()->getParent()];
+		entry= kf->basicBlockEntry[(*loop)->getHeader()];
+		ki = kf->instructions[entry];
+		ki->loop = *loop;
+	}
+	loopPathsH2H = kloops->getPathsH2H();
+	loopPathsH2E = kloops->getPathsH2E();
+	uncoveredloops = kloops->getLoops();
+}
+
+bool Executor::allCovered(){
+	if(uncoveredloops.size()){
+		return false;
+	}
+	/*
+	 * Go through all the functions, and check if the blocks have been visited.
+	 * If there is any block that hasn't been visited, return false.
+	 */
+	for(std::map<const llvm::Function*,std::vector<const llvm::BasicBlock*> >::const_iterator it = kmodule->unvisitedBlocks.begin()
+			, ie = kmodule->unvisitedBlocks.end();it != ie; it++){
+		if(it->second.size() && std::strcmp(it->first->getName().str().c_str(),"main") != 0){
+			std::cout<< "						Uncovered Block in function: " << it->first->getName().str() << std::endl;
+			it->second.front()->dump();
+			return false;
+		}
+	}
+	return true;
 }
