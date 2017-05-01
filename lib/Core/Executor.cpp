@@ -4073,7 +4073,7 @@ void Executor::processLoopInfo(llvm::BasicBlock* root){
 	klee::KLoops* kloops = new klee::KLoops(root);
 	kloops->printLoop();
 	kloops->genPath();
-	kloops->printPath();
+	//kloops->printPath();
 	const std::vector<llvm::Loop*> processedloops = kloops->getLoops();
 	KFunction* kf;
 	unsigned entry;
