@@ -1,6 +1,13 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/IR/Value.h"
+#include "llvm/ADT/SmallPtrSet.h"
+
+
 //#include "llvm/Support/CFG.h"
 
 #include <algorithm>
@@ -166,15 +173,57 @@ private:
 	std::map<llvm::Loop*, std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > > > pathsToExits;//For each exit, there is a vector of path.
 	std::map<llvm::Loop*, std::vector<std::vector<llvm::BasicBlock*> > > pathsToHead;
 	std::vector<llvm::Loop*> processedloops;
+
+	llvm::Function* getTargetFunction( llvm::Value *calledVal) {
+		using namespace llvm;
+	  SmallPtrSet< GlobalValue*, 3> Visited;
+
+	  Constant *c = dyn_cast<Constant>(calledVal);
+	  if (!c)
+	    return 0;
+
+	  while (true) {
+	    if ( GlobalValue *gv = dyn_cast<GlobalValue>(c)) {
+	      if (!Visited.insert(gv))
+	        return 0;
+
+	      if ( Function *f = dyn_cast<Function>(gv))
+	        return f;
+	      else if ( GlobalAlias *ga = dyn_cast<GlobalAlias>(gv))
+	        c = ga->getAliasee();
+	      else
+	        return 0;
+	    } else if ( llvm::ConstantExpr *ce = dyn_cast<llvm::ConstantExpr>(c)) {
+	      if (ce->getOpcode()==Instruction::BitCast)
+	        c = ce->getOperand(0);
+	      else
+	        return 0;
+	    } else
+	      return 0;
+	  }
+	  return NULL;
+	}
 public:
 	KLoops(llvm::BasicBlock* _root){
-		llvm::Module* module = _root->getParent()->getParent();
-		for(llvm::Module::iterator func = module->begin(), y=module->end(); func!=y; func++){
+		using namespace llvm;
+		 llvm::Function* func = _root->getParent();
+		std::vector< llvm::Function*> worklist;
+		worklist.push_back(func);
+		std::vector< llvm::Function*> processedList;
+		while(worklist.size()){
+			func = worklist.back();
+			worklist.pop_back();
 			//get the dominatortree of the current function
 			llvm::DominatorTree* DT = new llvm::DominatorTree();
 			if( func->isDeclaration()){
 				continue;
 			}
+			//if function is not reachable from main, we should not include any loop here.
+			if(	func->isDefTriviallyDead()){
+				std::cout<<func->getName().str()<<" is trivially Dead" << std::endl;
+				continue;
+			}
+			if( func->isDiscardableIfUnused())
 			std::cout<< func->getName().str()<< std::endl;
 			DT->DT->recalculate(*func);
 			//generate the LoopInfoBase for the current function
@@ -187,6 +236,24 @@ public:
 				//llvm::SmallVector<llvm::BasicBlock*,8> exitBlocks;
 				//(*loop_it)->getExitBlocks(exitBlocks);
 				kloops.push_back(*loop_it);
+			}
+			processedList.push_back(func);
+			//Add more functions called to the worklist.
+			for(llvm::Function::iterator BBit = func->begin(), BBitend = func->end(); BBit!=BBitend;BBit++){
+				for(llvm::BasicBlock::iterator it = BBit->begin(), itend = BBit->end(); it != itend; it++){
+					if(it->getOpcode() == llvm::Instruction::Call){
+						 llvm::CallInst* callInst = cast<CallInst>(it);
+						 llvm::Value* targetValue = callInst->getCalledValue();
+						 llvm::Function* targetFunc = getTargetFunction(targetValue);
+						if(targetFunc && ! targetFunc->isDeclaration()){
+							if(targetFunc->begin() != targetFunc->end()){
+								if(std::find(processedList.begin(),processedList.end(),targetFunc) == processedList.end()){
+									worklist.push_back(targetFunc);//If the called node hasn't been explored before, we need to add it to the worklist.
+								}
+							}
+						}
+					}
+				}
 			}
 		}
 	}
@@ -334,6 +401,7 @@ public:
 				for(std::vector<llvm::BasicBlock*>::iterator BBit = path->begin(),
 						BBitEnd = path->end(); BBit != BBitEnd; BBit++){
 					std::cout<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
+					(*BBit)->dump();
 				}
 				std::cout<<std::endl;
 			}

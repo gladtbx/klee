@@ -114,7 +114,6 @@ void instErrPerc::calcHue(std::string outFileName){
 
 //FindBlock needs edit.
 errPercNode* instErrPerc::find_Block_Rec(errPercNode* curr, const llvm::BasicBlock* target, int __id){
-	//sleep(1);
 	if(target == curr->getBB()){
 		return curr;
 	}

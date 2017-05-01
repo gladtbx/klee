@@ -1516,7 +1516,7 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 			  }
 		  }
 		  if(state.stack.back().loopPath.size()){
-			  std::cout<< "Currently at block:" << ki->inst->getParent()<<std::endl;
+			  //std::cout<< "Currently at block:" << ki->inst->getParent() <<":" <<ki->inst->getDebugLoc().getLine()<<std::endl;
 			  //If we are currently in a loop.
 			  //We should check if the current inst is one of the exits.
 			  //If yes, we need to mark one of the path being explored.
@@ -1525,8 +1525,22 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 			  loopPathInfo* currLoop = &state.stack.back().loopPath.back();
 			  SmallVector<llvm::BasicBlock*,8> exitBlocks;
 			  currLoop->loop->getExitBlocks(exitBlocks);
-			  if(std::find(exitBlocks.begin(),exitBlocks.end(),ki->inst->getParent()) != exitBlocks.end()){
+			  while( (std::find(exitBlocks.begin(),exitBlocks.end(),ki->inst->getParent()) != exitBlocks.end() ) &&
+					  !currLoop->loop->contains(ki->inst->getParent())){
+				  // A bug for getExitBlocks exists for llvm. The returned exit block might be an exit block of the inner loop that is PART of the outer loop.
+				  //Need to use while loop here because a single node might be exit node for multiple nested loops.
+				  //We are at one of the exitBlocks.
 				  //We should check if current path H2E has been covered.
+
+				  /*
+				  std::cout<<"	Current Block is: "<< ki->inst->getParent() << "Exit blocks are:";
+				  for(SmallVector<llvm::BasicBlock*,8>::iterator exitit=exitBlocks.begin(),exititend=exitBlocks.end(); exitit!=exititend ;exitit++){
+					  std::cout<<"			"<<*exitit;
+				  }
+				  std::cout<<std::endl;
+				*/
+
+
 				  std::vector<std::vector<llvm::BasicBlock*> >* uncoveredPaths = &currLoop->uncoveredPaths->second;
 				  currLoop->path.push_back(ki->inst->getParent());
 				  for(std::vector<std::vector<llvm::BasicBlock*> >::iterator uncoveredPath = uncoveredPaths->begin(),
@@ -1545,6 +1559,14 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 						  }
 						  break;
 					  }
+					  /*else{//We print the uncoveredloops
+						  std::cout<<"			Path still uncovered: ";
+						  for(std::vector<llvm::BasicBlock*>::iterator uncoveredBlockit = uncoveredPath->begin(), uncoveredBlockitend = uncoveredPath->end();
+								  uncoveredBlockit != uncoveredBlockitend; uncoveredBlockit++){
+							  std::cout<< *uncoveredBlockit<<":"<<(*uncoveredBlockit)->front().getDebugLoc().getLine()<< " -> " ;
+						  }
+						  std::cout<<std::endl;
+					  }*/
 				  }
 				  //if we hit an exit block.
 				  //We need to pop off the loop info.
@@ -1553,9 +1575,18 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 					  free(currLoop->uncoveredPaths);
 				  }
 				  //Pop the current loop info off the stack.
+				  std::cout<<"		LOOP poped:" << currLoop->loop << std::endl;
 				  state.stack.back().loopPath.pop_back();
+				  //Update the currLoop to one outer loop.
+				  if(state.stack.back().loopPath.size()){
+					  currLoop = &state.stack.back().loopPath.back();
+					  currLoop->loop->getExitBlocks(exitBlocks);
+				  }
+				  else{
+					  break;
+				  }
 			  }
-			  else{
+			  if(state.stack.back().loopPath.size()){
 				  //if the block we are at is not at the exit of the loop.
 				  currLoop->path.push_back(ki->inst->getParent());
 			  }
@@ -1570,25 +1601,8 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				  //If we hit the head again.
 				  if(currLoop->loop == ki->loop){
 					  //We should record the path explored by erasing the record path from uncovered paths.
-					  std::cout<< "		CurrentPath: ";
-					  for(std::vector<llvm::BasicBlock*>::iterator BBit = currLoop->path.begin(),
-							BBitEnd = currLoop->path.end(); BBit != BBitEnd; BBit++){
-						  std::cout<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
-					  }
-					  std::cout<< std::endl;
-					  std::vector<std::vector<llvm::BasicBlock*> >* uncoveredPaths = &currLoop->uncoveredPaths->second;
 
-/*					  std::cout<<"			Uncovered Paths:" << std::endl;
-					  for(std::vector<std::vector<llvm::BasicBlock*> >::iterator path = uncoveredPaths->begin(),
-							pathEnd = uncoveredPaths->end(); path != pathEnd; path++){
-							std::cout<<"	";
-							for(std::vector<llvm::BasicBlock*>::iterator BBit = path->begin(),
-									BBitEnd = path->end(); BBit != BBitEnd; BBit++){
-								std::cout<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
-							}
-							std::cout<<std::endl;
-					  }
-*/
+					  std::vector<std::vector<llvm::BasicBlock*> >* uncoveredPaths = &currLoop->uncoveredPaths->second;
 					  for(std::vector<std::vector<llvm::BasicBlock*> >::iterator uncoveredPath = uncoveredPaths->begin(),
 							  uncoveredPathEnd = uncoveredPaths->end(); uncoveredPath != uncoveredPathEnd; uncoveredPath++){
 						  if(*uncoveredPath == currLoop->path){
@@ -1602,10 +1616,24 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 									  = std::find(uncoveredloops.begin(),uncoveredloops.end(),currLoop->loop);
 								  if(uncoveredloop != uncoveredloops.end()){
 									  uncoveredloops.erase(uncoveredloop);
+										std::cout<<"										Left uncovered loops:"<<std::endl;
+										for(std::vector<llvm::Loop*>::iterator loopit = uncoveredloops.begin() , loopitend = uncoveredloops.end();
+												loopit != loopitend; loopit++){
+											std::cout<< (*loopit) << " uncovered" << std::endl;
+
+										}
 								  }
 							  }
 							  break;
 						  }
+						  /*else{//We print the uncoveredloops
+							  std::cout<<"			Path still uncovered: ";
+							  for(std::vector<llvm::BasicBlock*>::iterator uncoveredBlockit = uncoveredPath->begin(), uncoveredBlockitend = uncoveredPath->end();
+									  uncoveredBlockit != uncoveredBlockitend; uncoveredBlockit++){
+								  std::cout<< *uncoveredBlockit<<":"<<(*uncoveredBlockit)->front().getDebugLoc().getLine()<< " -> " ;
+							  }
+							  std::cout<<std::endl;
+						  }*/
 					  }
 					  //We should reset the path info.
 					  currLoop->path.clear();
@@ -1617,27 +1645,48 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 					  loopInfo.loop = ki->loop;
 					  loopInfo.uncoveredPaths = new std::pair<unsigned, std::vector<std::vector<llvm::BasicBlock*> > >;
 					  loopInfo.uncoveredPaths->first = 1;
-					  loopInfo.uncoveredPaths->second = loopPathsH2H[loopInfo.loop];
-					  //We might need to reconsider how to deal with H2H and H2E;
-					  for(std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > >::const_iterator loopPathsH2Eit = loopPathsH2E[loopInfo.loop].begin(),
-							  loopPathsH2Eendit = loopPathsH2E[loopInfo.loop].end(); loopPathsH2Eit != loopPathsH2Eendit; loopPathsH2Eit++){
-						  loopInfo.uncoveredPaths->second.insert(loopInfo.uncoveredPaths->second.end(),loopPathsH2Eit->second.begin(),loopPathsH2Eit->second.end());
+					  std::vector<llvm::Loop*>::iterator uncoveredloop
+						  = std::find(uncoveredloops.begin(),uncoveredloops.end(),loopInfo.loop);
+					  if(uncoveredloop != uncoveredloops.end()){
+						  //Current loop has not been covered, we need to explore all the paths.
+						  loopInfo.uncoveredPaths->second = loopPathsH2H[loopInfo.loop];
+						  //We might need to reconsider how to deal with H2H and H2E;
+						  for(std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > >::const_iterator loopPathsH2Eit = loopPathsH2E[loopInfo.loop].begin(),
+								  loopPathsH2Eendit = loopPathsH2E[loopInfo.loop].end(); loopPathsH2Eit != loopPathsH2Eendit; loopPathsH2Eit++){
+							  if(loopPathsH2Eit->first != ki->inst->getParent()){//We only process when Exit node is not the entry node.
+								  loopInfo.uncoveredPaths->second.insert(loopInfo.uncoveredPaths->second.end(),loopPathsH2Eit->second.begin(),loopPathsH2Eit->second.end());
+							  }
+						  }
+					  }else{
+						  //The subloop has been covered already. We don't need to go through path by path.
+
 					  }
 					  state.stack.back().loopPath.push_back(loopInfo);
 				  }
 			  }
 			  else{
 				  std::cout<<"Entering Loop:" << ki->loop<< std::endl;
-				  //If this is the first time we are in this loop
+				  //If this is the "first" time we are in this loop
+				  //FIXME: If we have already done the loop before, we should not re explore everything.
 				  loopPathInfo loopInfo;
 				  loopInfo.loop = ki->loop;
 				  loopInfo.uncoveredPaths = new std::pair<unsigned, std::vector<std::vector<llvm::BasicBlock*> > >;
 				  loopInfo.uncoveredPaths->first = 1;
-				  loopInfo.uncoveredPaths->second = loopPathsH2H[loopInfo.loop];
-				  //We might need to reconsider how to deal with H2H and H2E;
-				  for(std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > >::const_iterator loopPathsH2Eit = loopPathsH2E[loopInfo.loop].begin(),
-						  loopPathsH2Eendit = loopPathsH2E[loopInfo.loop].end(); loopPathsH2Eit != loopPathsH2Eendit; loopPathsH2Eit++){
-					  loopInfo.uncoveredPaths->second.insert(loopInfo.uncoveredPaths->second.end(),loopPathsH2Eit->second.begin(),loopPathsH2Eit->second.end());
+				  std::vector<llvm::Loop*>::iterator uncoveredloop
+					  = std::find(uncoveredloops.begin(),uncoveredloops.end(),loopInfo.loop);
+				  if(uncoveredloop != uncoveredloops.end()){
+					  //Current loop has not been covered, we need to explore all the paths.
+					  loopInfo.uncoveredPaths->second = loopPathsH2H[loopInfo.loop];
+					  //We might need to reconsider how to deal with H2H and H2E;
+					  for(std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > >::const_iterator loopPathsH2Eit = loopPathsH2E[loopInfo.loop].begin(),
+							  loopPathsH2Eendit = loopPathsH2E[loopInfo.loop].end(); loopPathsH2Eit != loopPathsH2Eendit; loopPathsH2Eit++){
+						  if(loopPathsH2Eit->first != ki->inst->getParent()){//We only process when Exit node is not the entry node.
+							  loopInfo.uncoveredPaths->second.insert(loopInfo.uncoveredPaths->second.end(),loopPathsH2Eit->second.begin(),loopPathsH2Eit->second.end());
+						  }
+					  }
+				  }else{
+					  //The subloop has been covered already. We don't need to go through path by path.
+
 				  }
 				  state.stack.back().loopPath.push_back(loopInfo);
 			  }
