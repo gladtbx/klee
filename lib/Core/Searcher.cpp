@@ -693,6 +693,38 @@ void LoopReductionSearcher::update(ExecutionState *current,
 				blocked_states.push_back((*addedIt));
 				continue;
 			}
+			//We also need to check if the current state is possible to cover an uncovered state.
+			/*std::cout<< "		CurrentPath: ";
+			  for(std::vector<llvm::BasicBlock*>::iterator BBit = currLoop->path.begin(),
+					BBitEnd = currLoop->path.end(); BBit != BBitEnd; BBit++){
+				  std::cout<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
+			  }
+			  std::cout<< std::endl;*/
+			bool stateadded = false;
+			std::vector<std::vector<llvm::BasicBlock*> > uncoveredPaths = currLoop->uncoveredPaths->second;
+			for(std::vector<std::vector<llvm::BasicBlock*> >::iterator uncoveredPathit = uncoveredPaths.begin(), uncoveredPathitend = uncoveredPaths.end();
+					uncoveredPathit != uncoveredPathitend; uncoveredPathit++){
+				/*std::cout<< "Uncovered Path:";
+				for(std::vector<llvm::BasicBlock*>::iterator uncoveredBlockit = uncoveredPathit->begin(), uncoveredBlockitend = uncoveredPathit->end();
+						  uncoveredBlockit != uncoveredBlockitend; uncoveredBlockit++){
+					  std::cout<< *uncoveredBlockit<<":"<<(*uncoveredBlockit)->front().getDebugLoc().getLine()<< " -> " ;
+				  }
+				  std::cout<<std::endl;*/
+				if(currLoop->path.size()<=uncoveredPathit->size()){
+					if(std::equal(currLoop->path.begin(),currLoop->path.end(),uncoveredPathit->begin())){
+						//Current path is possible to cover uncovered states
+						//Might add additional reasoning here.
+						states.push_back((*addedIt));
+						stateadded = true;
+						break;
+					}
+				}
+			}
+			if(stateadded == false){
+				blocked_states.push_back((*addedIt));
+				std::cout<<"Path blocked!" << std::endl;
+			}
+			continue;
 		}
 		states.push_back((*addedIt));
 	}
