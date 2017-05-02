@@ -4076,7 +4076,7 @@ Interpreter *Interpreter::create(const InterpreterOptions &opts,
 
 void Executor::processLoopInfo(llvm::BasicBlock* root){
 	klee::KLoops* kloops = new klee::KLoops(root);
-	kloops->printLoop();
+	//kloops->printLoop();
 	kloops->genPath();
 	//kloops->printPath();
 	const std::vector<llvm::Loop*> processedloops = kloops->getLoops();
@@ -4106,11 +4106,11 @@ bool Executor::allCovered(){
 	 */
 	for(std::map<const llvm::Function*,std::vector<const llvm::BasicBlock*> >::const_iterator it = kmodule->unvisitedBlocks.begin()
 			, ie = kmodule->unvisitedBlocks.end();it != ie; it++){
-		if(it->second.size() && std::strcmp(it->first->getName().str().c_str(),"main") != 0){
+		/*if(it->second.size() && std::strcmp(it->first->getName().str().c_str(),"main") != 0){
 			std::cout<< "						Uncovered Block in function: " << it->first->getName().str() << std::endl;
 			it->second.front()->dump();
 			return false;
-		}
+		}*/
 	}
 	return true;
 }
