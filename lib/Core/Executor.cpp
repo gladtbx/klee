@@ -4101,11 +4101,11 @@ bool Executor::allCovered(){
 	 */
 	for(std::map<const llvm::Function*,std::vector<const llvm::BasicBlock*> >::const_iterator it = kmodule->unvisitedBlocks.begin()
 			, ie = kmodule->unvisitedBlocks.end();it != ie; it++){
-		/*if(it->second.size() && std::strcmp(it->first->getName().str().c_str(),"main") != 0){
-			std::cout<< "						Uncovered Block in function: " << it->first->getName().str() << std::endl;
-			it->second.front()->dump();
+		if(it->second.size() && std::strcmp(it->first->getName().str().c_str(),"main") != 0){
+			//std::cout<< "						Uncovered Block in function: " << it->first->getName().str() << std::endl;
+			//it->second.front()->dump();
 			return false;
-		}*/
+		}
 	}
 	return true;
 }
