@@ -39,11 +39,11 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const MemoryMap &mm);
 struct loopPathInfo{
 	llvm::Loop* loop;
 	std::vector<llvm::BasicBlock*> path;
-	std::pair<unsigned, std::vector<std::vector<llvm::BasicBlock*> > > *uncoveredPaths;
-	loopPathInfo():loop(NULL),uncoveredPaths(NULL){
+	//std::pair<unsigned, std::vector<std::vector<llvm::BasicBlock*> > > *uncoveredPaths;
+	loopPathInfo():loop(NULL){
 	}
-	loopPathInfo(const loopPathInfo &_rhs):loop(_rhs.loop),path(_rhs.path),uncoveredPaths(_rhs.uncoveredPaths){
-		uncoveredPaths->first++;
+	loopPathInfo(const loopPathInfo &_rhs):loop(_rhs.loop),path(_rhs.path){
+		//uncoveredPaths->first++;
 	}
 };
 

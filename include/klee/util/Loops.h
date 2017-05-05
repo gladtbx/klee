@@ -297,9 +297,10 @@ public:
 			Q.pop();//currPath is the path until now.
 			currBlock = currPath.back();//currBlock is the current BasicBlock we need to explore.
 			//Check if we find an exit.
-			if(std::find(exitBlocks.begin(),exitBlocks.end(),currBlock) != exitBlocks.end()){
+			if(std::find(exitBlocks.begin(),exitBlocks.end(),currBlock) != exitBlocks.end()&&
+					  !curr->contains(currBlock)){
 				//We find one of the exit blocks.
-				pathsToExits[curr][currBlock].push_back(currPath);
+				pathsToHead[curr].push_back(currPath);
 				continue;
 			}
 			//We need to check if currBlock is the head node.
@@ -340,8 +341,8 @@ public:
 			}
 		}
 		//We need to cross list all the path from the head to exit with the path from head to head
-		std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > > ptoexits = pathsToExits[curr];
-		std::vector<std::vector<llvm::BasicBlock*> > pathHtoH = pathsToHead[curr];
+		//std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > > ptoexits = pathsToExits[curr];
+		//std::vector<std::vector<llvm::BasicBlock*> > pathHtoH = pathsToHead[curr];
 		/*
 		for(std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > >::iterator exit = ptoexits.begin(),
 				exitEnd = ptoexits.end(); exit!=exitEnd;exit++){

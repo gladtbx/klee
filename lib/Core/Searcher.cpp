@@ -469,7 +469,8 @@ void LoopReductionSearcher::update(ExecutionState *current,
 		if((*addedIt)->stack.back().loopPath.size()){
 			loopPathInfo* currLoop = &((*addedIt)->stack.back().loopPath.back());
 			//We check the number of uncovered path for the current loop. It there is none, we put the state in blocked queue.
-			if(currLoop->uncoveredPaths->second.empty()){
+			std::vector<std::vector<llvm::BasicBlock*> > uncoveredPaths = executor.getUncoveredPaths(currLoop->loop);
+			if(uncoveredPaths.empty()){
 				blocked_states.push_back((*addedIt));
 				continue;
 			}
@@ -481,7 +482,6 @@ void LoopReductionSearcher::update(ExecutionState *current,
 			  }
 			  std::cout<< std::endl;*/
 			bool stateadded = false;
-			std::vector<std::vector<llvm::BasicBlock*> > uncoveredPaths = currLoop->uncoveredPaths->second;
 			for(std::vector<std::vector<llvm::BasicBlock*> >::iterator uncoveredPathit = uncoveredPaths.begin(), uncoveredPathitend = uncoveredPaths.end();
 					uncoveredPathit != uncoveredPathitend; uncoveredPathit++){
 				/*std::cout<< "Uncovered Path:";
