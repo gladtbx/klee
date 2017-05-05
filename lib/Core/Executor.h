@@ -212,7 +212,6 @@ private:
   llvm::raw_string_ostream debugLogBuffer;
 
   std::map<llvm::Loop*,std::vector<std::vector<llvm::BasicBlock*> > > loopPathsH2H;
-  std::map<llvm::Loop*, std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > > > loopPathsH2E;
   std::vector<llvm::Loop*> uncoveredloops;
 
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
@@ -534,6 +533,10 @@ public:
   Expr::Width getWidthForLLVMType(LLVM_TYPE_Q llvm::Type *type) const;
 
   bool allCovered();
+
+  std::vector<std::vector<llvm::BasicBlock*> >& getUncoveredPaths(llvm::Loop* loop){
+	  return loopPathsH2H[loop];
+  }
 };
   
 } // End klee namespace
