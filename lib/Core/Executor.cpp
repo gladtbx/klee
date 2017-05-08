@@ -1610,11 +1610,6 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 									  = std::find(uncoveredloops.begin(),uncoveredloops.end(),currLoop->loop);
 								  if(uncoveredloop != uncoveredloops.end()){
 									  uncoveredloops.erase(uncoveredloop);
-										for(std::vector<llvm::Loop*>::iterator loopit = uncoveredloops.begin() , loopitend = uncoveredloops.end();
-												loopit != loopitend; loopit++){
-											std::cout<< (*loopit) << " uncovered" << std::endl;
-
-										}
 								  }
 							  }
 							  break;
@@ -2912,9 +2907,9 @@ void Executor::run(ExecutionState &initialState) {
   searcher->update(0, newStates, std::vector<ExecutionState *>());
 
   while (!states.empty() && !haltExecution) {
-	if(LoopReduction && allCovered()){
+	/*if(LoopReduction && allCovered()){
 		break;
-	}
+	}*/
     ExecutionState &state = searcher->selectState();
     KInstruction *ki = state.pc;
     stepInstruction(state);
