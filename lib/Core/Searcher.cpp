@@ -655,16 +655,9 @@ bool LoopReductionSearcher::allCovered(){
 bool LoopReductionSearcher::empty(){
 	if(!states.empty())
 		return false;
+	std::cout<<"NormalState empty!!!!!!!!!!!!!!!!!!!"<<std::endl;
 	if(blocked_states.size()){
 			return allCovered();
-/*			for(std::vector<ExecutionState*>::reverse_iterator block_it = blocked_states.rbegin(),
-					block_itEnd = blocked_states.rend(); block_it != block_itEnd; block_it++){
-				if(!allCovered(*block_it)){
-					next_state = *block_it;
-					return false;
-				}
-			}
-*/
 	}
 	return true;
 }
@@ -674,7 +667,8 @@ ExecutionState &LoopReductionSearcher::selectState(){
 		return *states.back();
 	}
 	if(blocked_states.size()){
-		std::cout<<"loopPath size: " << blocked_states.size() << std::endl;
+		//std::cout<<"loopPath size: " << blocked_states.size() << std::endl;
+		states.push_back(blocked_states.back());
 		return *blocked_states.back();
 		//return *next_state;
 	}
@@ -722,10 +716,10 @@ void LoopReductionSearcher::update(ExecutionState *current,
 			}
 			if(stateadded == false){
 				blocked_states.push_back((*addedIt));
-				std::cout<<"Path blocked!" << std::endl;
 			}
 			continue;
 		}
+		//FIXME: We should check if the current BB is covered already. If so, we should not continue? No, that is not right
 		states.push_back((*addedIt));
 	}
 	for(std::vector<ExecutionState*>::const_iterator removedIt = removedStates.begin(),
