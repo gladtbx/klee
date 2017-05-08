@@ -305,6 +305,11 @@ namespace {
   LoopReduction("loop-reduction",
 		  cl::desc("Apply loop reduction, reduce number of states forked inside loops."),
 		  cl::init(false));
+
+  cl::opt<bool>
+  ActivePruning("active-pruning",
+		  cl::desc("Actively use solver to prune states"),
+		  cl::init(false));
 }
 
 
@@ -1513,6 +1518,9 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 					  kmodule->unvisitedBlocks[kfunction].end(),kblock);
 			  if(unvisitedBlock != kmodule->unvisitedBlocks[kfunction].end()){
 				  kmodule->unvisitedBlocks[kfunction].erase(unvisitedBlock);
+				  if(kmodule->unvisitedBlocks[kfunction].size()== 0){
+					  kmodule->unvisitedBlocks.erase(kfunction);
+				  }
 			  }
 		  }
 		  if(state.stack.back().loopPath.size()){
@@ -4040,7 +4048,7 @@ void Executor::processLoopInfo(llvm::BasicBlock* root){
 	uncoveredloops = kloops->getLoops();
 }
 
-bool Executor::allCovered(){
+bool Executor::allCovered(std::vector<ExecutionState*>& bstates){
 	if(uncoveredloops.size()){
 		return false;
 	}
@@ -4048,12 +4056,93 @@ bool Executor::allCovered(){
 	 * Go through all the functions, and check if the blocks have been visited.
 	 * If there is any block that hasn't been visited, return false.
 	 */
-	for(std::map<const llvm::Function*,std::vector<const llvm::BasicBlock*> >::const_iterator it = kmodule->unvisitedBlocks.begin()
+	double timeout = coreSolverTimeout;
+	for(std::map<const llvm::Function*,std::vector<const llvm::BasicBlock*> >::iterator it = kmodule->unvisitedBlocks.begin()
 			, ie = kmodule->unvisitedBlocks.end();it != ie; it++){
 		if(it->second.size() && std::strcmp(it->first->getName().str().c_str(),"main") != 0){
-			//std::cout<< "						Uncovered Block in function: " << it->first->getName().str() << std::endl;
-			//it->second.front()->dump();
-			return false;
+			bool functionVisited = true;
+			for(std::vector<const llvm::BasicBlock*>::iterator bit = it->second.begin(), bitEnd=it->second.end(); bit != bitEnd; bit++){
+				if(&(it->first->getEntryBlock()) == (*bit)){
+					//Unvisited block is head of function, all blocks for the current function should not be visited.
+					functionVisited = false;
+					break;
+				}
+				//If we don't actively prune states, we should return false now.
+				if(!ActivePruning){
+					return false;
+				}
+				bool predVisited=false;
+				const llvm::BasicBlock* predecessor;
+				for(llvm::const_pred_iterator pbit = llvm::pred_begin(*bit), pbitEnd=llvm::pred_end(*bit);pbit!=pbitEnd;pbit++){
+					predecessor = *pbit;
+					if(std::find(it->second.begin(),it->second.end(),predecessor) == it->second.end()){
+						//Predecessor found inside unvisited block.
+						predVisited=true;
+						break;
+					}
+				}
+				if(!predVisited){
+					continue;
+				}
+				//Now we have a bit that one of its pred is visited. We need to find if it is a branch/switch ins.
+			    const llvm::Instruction* inst = predecessor->getTerminator();
+			    bool statePicked=false;
+			    std::vector<ExecutionState*>::iterator targetState;
+				for(std::vector<ExecutionState*>::iterator sit = bstates.begin(), sitEnd=bstates.end();sit != sitEnd;sit++){
+				    ref<Expr> cond;
+				    bool pathtotake;
+					switch (inst->getOpcode()) {
+				    case Instruction::Br :{
+				    	const BranchInst *bi = cast<BranchInst>(inst);
+				    	if(bi->getSuccessor(0)== *bit){
+				    		pathtotake=0;
+				    	}
+				    	else{
+				    		pathtotake=1;
+				    	}
+				    	assert(bi->getCondition() == bi->getOperand(0) &&
+							 "Wrong operand index!");
+				    	cond = eval((*sit)->pc, 0,**sit).value;
+				    	break;
+				    }
+				  //  case Instruction::Switch :{
+				    	//Fixme: Switch not supported now.
+				   // }
+				    default:
+				    	statePicked=true;
+				    	targetState=sit;
+				    	break;
+				    }
+					if(statePicked){
+						break;
+					}
+					Solver::Validity res;
+					solver->setTimeout(timeout);
+					bool success = solver->evaluate(**sit, cond, res);
+					solver->setTimeout(0);
+					if (!success) {
+						//Timed out
+				    	statePicked=true;
+				    	targetState=sit;
+						break;
+					}
+					if ((res==Solver::True && pathtotake==1) || (res==Solver::False && pathtotake==0) ){
+						//FIXME: for switch, more logic needed.
+						//Current state can not cover the required block.
+						continue;
+					}
+				}
+				if(statePicked){
+					if(targetState+1 != bstates.end()){
+						std::rotate(targetState, targetState + 1, bstates.end());
+					}
+					return false;
+				}
+			}
+			if(!functionVisited){
+				continue;
+			}
+			//return false;
 		}
 	}
 	return true;

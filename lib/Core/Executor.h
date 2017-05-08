@@ -23,6 +23,11 @@
 #include "klee/util/ArrayCache.h"
 #include "llvm/Support/raw_ostream.h"
 #include "klee/util/Loops.h"
+#if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
+#include "llvm/Support/CFG.h"
+#else
+#include "llvm/IR/CFG.h"
+#endif
 
 #include "llvm/ADT/Twine.h"
 
@@ -557,7 +562,7 @@ public:
   size_t getAllocationAlignment(const llvm::Value *allocSite) const;
 //  Expr::Width getWidthForLLVMType(LLVM_TYPE_Q llvm::Type *type) const;
 
-  bool allCovered();
+  bool allCovered(std::vector<ExecutionState*>&);
 
   std::vector<std::vector<llvm::BasicBlock*> >& getUncoveredPaths(llvm::Loop* loop){
 	  return loopPathsH2H[loop];

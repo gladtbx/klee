@@ -429,7 +429,7 @@ void InterleavedSearcher::update(
 }
 
 bool LoopReductionSearcher::allCovered(){
-	return executor.allCovered();
+	return executor.allCovered(blocked_states);
 }
 
 bool LoopReductionSearcher::empty(){
@@ -447,8 +447,10 @@ ExecutionState &LoopReductionSearcher::selectState(){
 	}
 	if(blocked_states.size()){
 		//std::cout<<"loopPath size: " << blocked_states.size() << std::endl;
+
 		states.push_back(blocked_states.back());
-		return *blocked_states.back();
+		blocked_states.pop_back();
+		return *states.back();
 		//return *next_state;
 	}
 	klee_error("No more states to explore.");
