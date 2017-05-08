@@ -655,7 +655,6 @@ bool LoopReductionSearcher::allCovered(){
 bool LoopReductionSearcher::empty(){
 	if(!states.empty())
 		return false;
-	std::cout<<"NormalState empty!!!!!!!!!!!!!!!!!!!"<<std::endl;
 	if(blocked_states.size()){
 			return allCovered();
 	}
