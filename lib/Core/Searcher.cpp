@@ -656,7 +656,7 @@ bool LoopReductionSearcher::empty(){
 	if(!states.empty())
 		return false;
 	if(blocked_states.size()){
-			return allCovered();
+		return allCovered();
 	}
 	return true;
 }

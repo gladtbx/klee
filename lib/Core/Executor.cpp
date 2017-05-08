@@ -3022,9 +3022,9 @@ void Executor::run(ExecutionState &initialState) {
   searcher->update(0, newStates, std::vector<ExecutionState *>());
 
   while (!states.empty() && !haltExecution) {
-	/*if(LoopReduction && allCovered()){
+	if(LoopReduction && searcher->empty()){
 		break;
-	}*/
+	}
     ExecutionState &state = searcher->selectState();
     KInstruction *ki = state.pc;
     stepInstruction(state);
