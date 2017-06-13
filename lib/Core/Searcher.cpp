@@ -470,19 +470,19 @@ void LoopReductionSearcher::update(ExecutionState *current,
 				continue;
 			}
 			//We also need to check if the current state is possible to cover an uncovered state.
-			std::cout<< "	CurrLoop:" << currLoop<<" for CurrentUncoverablePath: ";
+			/*std::cout<< "	CurrLoop:" << currLoop<<" for CurrentUncoverablePath: ";
 			  for(std::vector<Path*>::iterator BBit = currLoop->uncoverablePaths.begin(),
 					BBitEnd = currLoop->uncoverablePaths.end(); BBit != BBitEnd; BBit++){
 				  std::cout<< *BBit;
 			  }
-			std::cout<< std::endl;
+			std::cout<< std::endl;*/
 			bool stateadded = false;
 			for(std::vector<Path>::iterator uncoveredPathit = uncoveredPaths->begin(), uncoveredPathitend = uncoveredPaths->end();
 				uncoveredPathit != uncoveredPathitend; uncoveredPathit++){
 				//std::cerr<<"---Checking " << &*uncoveredPathit<<std::endl;
 				if(std::find(currLoop->uncoverablePaths.begin(),currLoop->uncoverablePaths.end(),&*uncoveredPathit)
 					!=currLoop->uncoverablePaths.end()){
-					std::cerr<<"Uncovered Path Eliminated!" << std::endl;
+					//std::cerr<<"Uncovered Path Eliminated!" << std::endl;
 					continue;
 				}
 /*				std::cout<< "Uncovered Path:";
