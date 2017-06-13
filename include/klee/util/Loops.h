@@ -326,6 +326,8 @@ public:
 								if(invariants.find(bi->getCondition()) != invariants.end()){
 									//If the condition is invariant, we add it to the constraints of the loop path.
 									//std::cerr<<"$$$$$$$$$$$$$$$$$$$$$Condition Added"<< std::endl;
+									//FIXME: We need to differentiate the difference between inner-loop invariants and outterloop invariants causing
+									//the branch to be invariant.
 									pit->addCond(currBlock);
 								}
 								//We need to check if the condition set
