@@ -216,8 +216,9 @@ private:
   // @brief buffer to store logs before flushing to file
   llvm::raw_string_ostream debugLogBuffer;
 
-  std::map<llvm::Loop*,std::vector<std::vector<llvm::BasicBlock*> > > loopPathsH2H;
+  std::map<llvm::Loop*,Paths > loopPathsH2H;
   std::vector<llvm::Loop*> uncoveredloops;
+  std::set<Path*> uncoverablePaths;
 
   llvm::Function* getTargetFunction(llvm::Value *calledVal,
                                     ExecutionState &state);
@@ -539,8 +540,12 @@ public:
 
   bool allCovered(std::vector<ExecutionState*>&);
 
-  std::vector<std::vector<llvm::BasicBlock*> >& getUncoveredPaths(llvm::Loop* loop){
+  Paths& getUncoveredPaths(llvm::Loop* loop){
 	  return loopPathsH2H[loop];
+  }
+
+  void addUncoverablePath(Path* path){
+	  uncoverablePaths.insert(path);
   }
 };
   
