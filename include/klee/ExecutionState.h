@@ -15,6 +15,8 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "klee/Internal/ADT/TreeStream.h"
 #include "klee/MergeHandler.h"
+#include "klee/util/Loops.h"
+
 
 // FIXME: We do not want to be exposing these? :(
 #include "../../lib/Core/AddressSpace.h"
@@ -39,11 +41,11 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const MemoryMap &mm);
 struct loopPathInfo{
 	llvm::Loop* loop;
 	std::vector<llvm::BasicBlock*> path;
-	//std::pair<unsigned, std::vector<std::vector<llvm::BasicBlock*> > > *uncoveredPaths;
+	std::vector<Path*> uncoverablePaths;
 	loopPathInfo():loop(NULL){
 	}
-	loopPathInfo(const loopPathInfo &_rhs):loop(_rhs.loop),path(_rhs.path){
-		//uncoveredPaths->first++;
+	loopPathInfo(const loopPathInfo &_rhs):loop(_rhs.loop),path(_rhs.path),uncoverablePaths(_rhs.uncoverablePaths){
+		//FIXME: Do not use cpy ctor, use a common loop path info instead.
 	}
 };
 

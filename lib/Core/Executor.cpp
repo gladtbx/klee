@@ -1549,11 +1549,11 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				*/
 
 
-				  std::vector<std::vector<llvm::BasicBlock*> >* uncoveredPaths = &loopPathsH2H[currLoop->loop];
+				  Paths* uncoveredPaths = &loopPathsH2H[currLoop->loop];
 				  currLoop->path.push_back(ki->inst->getParent());
-				  for(std::vector<std::vector<llvm::BasicBlock*> >::iterator uncoveredPath = uncoveredPaths->begin(),
+				  for(std::vector<Path>::iterator uncoveredPath = uncoveredPaths->begin(),
 						  uncoveredPathEnd = uncoveredPaths->end(); uncoveredPath != uncoveredPathEnd; uncoveredPath++){
-					  if(*uncoveredPath == currLoop->path){
+					  if(uncoveredPath->same(currLoop->path)){
 						  //Our path is a match of the uncovered path.
 						  uncoveredPaths->erase(uncoveredPath);
 						  //We need to check if we have hit every possible path of the loop.
@@ -1604,10 +1604,10 @@ void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
 				  if(currLoop->loop == ki->loop){
 					  //We should record the path explored by erasing the record path from uncovered paths.
 
-					  std::vector<std::vector<llvm::BasicBlock*> >* uncoveredPaths = &loopPathsH2H[currLoop->loop];
-					  for(std::vector<std::vector<llvm::BasicBlock*> >::iterator uncoveredPath = uncoveredPaths->begin(),
+					  Paths* uncoveredPaths = &loopPathsH2H[currLoop->loop];
+					  for(std::vector<Path>::iterator uncoveredPath = uncoveredPaths->begin(),
 							  uncoveredPathEnd = uncoveredPaths->end(); uncoveredPath != uncoveredPathEnd; uncoveredPath++){
-						  if(*uncoveredPath == currLoop->path){
+						  if(uncoveredPath->same(currLoop->path)){
 							  //Our path is a match of the uncovered path.
 							  uncoveredPaths->erase(uncoveredPath);
 							  //std::cout<<"	Erased path!"<< std::endl;
@@ -4029,9 +4029,7 @@ Interpreter *Interpreter::create(LLVMContext &ctx, const InterpreterOptions &opt
 
 void Executor::processLoopInfo(llvm::BasicBlock* root){
 	klee::KLoops* kloops = new klee::KLoops(root);
-	//kloops->printLoop();
 	kloops->genPath();
-	//kloops->printPath();
 	const std::vector<llvm::Loop*> processedloops = kloops->getLoops();
 	KFunction* kf;
 	unsigned entry;
@@ -4046,12 +4044,44 @@ void Executor::processLoopInfo(llvm::BasicBlock* root){
 	}
 	loopPathsH2H = kloops->getPathsH2H();
 	uncoveredloops = kloops->getLoops();
+	kloops->printLoop();
+
+	kloops->printPath();
 }
 
 bool Executor::allCovered(std::vector<ExecutionState*>& bstates){
-	if(uncoveredloops.size()){
-		return false;
+	//FIXME: We should add a structure for each state to record which loops are executed already.
+	for(std::vector<llvm::Loop*>::iterator loopIt = uncoveredloops.begin(), loopItEnd=uncoveredloops.end();
+			loopIt != loopItEnd; loopIt++){
+		//First find the uncovered path of the uncovered loop
+		Paths* uncoveredPaths = &loopPathsH2H[*loopIt];
+		for(std::vector<Path>::iterator uncoveredPathit = uncoveredPaths->begin(), uncoveredPathitend = uncoveredPaths->end();
+						uncoveredPathit != uncoveredPathitend; uncoveredPathit++){
+			for(std::vector<ExecutionState*>::iterator bIt = bstates.begin(), bItEnd = bstates.end();
+					bIt != bItEnd; bIt++){
+				//FIXME: Assuming there is no recursion.
+				std::vector<loopPathInfo>* loopPath = &(*bIt)->stack.back().loopPath;
+				//We need to find the loopPathInfo for the loop loopIt.
+				for(std::vector<loopPathInfo>::iterator lpIt = loopPath->begin(), lpItEnd=loopPath->end();
+						lpIt != lpItEnd; lpIt++){
+					if(lpIt->loop == *loopIt){
+						//Now we find the loop the has uncovered loops.
+						if(std::find(lpIt->uncoverablePaths.begin(),lpIt->uncoverablePaths.end(),&*uncoveredPathit) != lpIt->uncoverablePaths.end()){
+							//The path is uncoverable for the current bstate.
+							continue;
+						}
+						else{
+							std::iter_swap(bIt,--bItEnd);
+							return false;
+						}
+					}
+				}
+			}
+		}
 	}
+/*	if(uncoveredloops.size()){
+		return false;
+	}*/
 	/*
 	 * Go through all the functions, and check if the blocks have been visited.
 	 * If there is any block that hasn't been visited, return false.

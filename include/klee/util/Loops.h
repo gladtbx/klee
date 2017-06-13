@@ -3,10 +3,12 @@
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/IR/Value.h"
 #include "llvm/ADT/SmallPtrSet.h"
-
+#include "klee/util/Ref.h"
+#include "klee/Expr.h"
 
 //#include "llvm/Support/CFG.h"
 
@@ -17,161 +19,164 @@
 #ifndef LOOPS_H
 #define LOOPS_H
 namespace klee{
-/*
-class Loop{
+
+class Path{
 private:
-	int entry;
-	int exit;
-	std::vector<int> cycle;
-	Loop():entry(0),exit(0){}
+	std::vector<llvm::BasicBlock*> path;
+	//The branch at the end of the block is invariant.
+	std::vector<llvm::BasicBlock*> invariantBranches;
 public:
-	Loop(int _entry, int _exit, const std::vector<int> & _cycle):entry(_entry),exit(_exit),cycle(_cycle){
-	}
-	~Loop(){
-		cycle.clear();
-	}
+	Path(){
 
-	void print(){
-		std::cout<< "entry: "<< entry << " , exit: " << exit << std::endl;
 	}
-};
-
-class Loops{
-private:
-	const std::vector<std::vector<int> > cycles;
-	std::vector<errPercNode*> tarjanNodes;
-	std::vector<Loop> loops;
-
-public:
-	Loops(const std::vector<std::vector<int> >& _cycles,
-			const std::vector<errPercNode*> _tarjanNodes):cycles(_cycles),tarjanNodes(_tarjanNodes){
+	virtual ~Path(){
+		path.clear();
 	}
 
-	void print(){
-		for(std::vector<Loop>::iterator loop = loops.begin(); loop != loops.end(); loop++){
-			loop->print();
+	Path(std::vector<llvm::BasicBlock*>& p):path(p){
+
+	}
+
+	Path(const Path& rhs):path(rhs.path),invariantBranches(rhs.invariantBranches){
+		//std::cerr<<"***********************CPY Called!"<<std::endl;
+		//dump();
+		//std::cerr<<"***********************"<<std::endl;
+	}
+
+	void addBlock(llvm::BasicBlock* bb){
+		path.push_back(bb);
+	}
+
+	void addCond(llvm::BasicBlock* bit){
+		invariantBranches.push_back(bit);
+	}
+
+	std::vector<llvm::BasicBlock*>::iterator begin(){
+		return path.begin();
+	}
+
+	std::vector<llvm::BasicBlock*>::iterator end(){
+		return path.end();
+	}
+
+	bool same(const std::vector<llvm::BasicBlock*>& in){
+		return std::equal(path.begin(),path.end(),in.begin());
+	}
+
+	long unsigned int size() const{
+		return path.size();
+	}
+
+	void dump() const{
+		std::cout<<"Invariants for path:";
+		for(std::vector<llvm::BasicBlock*>::const_iterator BBit = path.begin(),
+			BBitEnd = path.end(); BBit != BBitEnd; BBit++){
+			std::cout<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
+			//(*BBit)->dump();
 		}
+		std::cout<< std::endl<<"Invariant Branches:              ";
+		for(std::vector<llvm::BasicBlock*>::const_iterator invit = invariantBranches.begin(),
+				invitEnd=invariantBranches.end();invit != invitEnd; invit++){
+			std::cout<<*invit<<"  ";
+		}
+		std::cout<<std::endl;
 	}
 
-	void gen_loops(){
-		for(std::vector<std::vector<int> >::const_iterator i = cycles.begin(); i != cycles.end(); i++){
-			//For each cycle, potentially it is a loop.
-			std::cout<< "=====================cycle starts========================" << std::endl;
-			int loop_exit_id = -1;
-			int loop_entry_id = -1;
-			for(std::vector<int>::const_iterator j = i->begin(); j != i->end(); j++){
-				//for each cycle, find the entry and exit
-				//entry is the block which has all the successors in the same cycle, with one of ancestors outside the cycle
-				//exit is the block with all the ancestors in the same cycle, and one of the successors outside the cycle.
-				errPercNode* curr = tarjanNodes[*j];
-				std::vector<errPercNode*> succs= curr->getSuccessor();
-				int outCount = 0;
-				int inCount = 0;
-				int succNodeId;
-				//check succs
-				for(std::vector<errPercNode*>::const_iterator succ = succs.begin(); succ != succs.end(); succ++){
-					int tarjanID = (*succ)->get_tarjanid();
-					if(std::find(i->begin(),i->end(),tarjanID) == i->end()){
-						//Succ is not in Cycle
-						outCount++;
-						succNodeId = tarjanID;
-					}
+	bool uncoverablePath(std::vector<llvm::BasicBlock*> loopPath){
+		std::vector<llvm::BasicBlock*>::iterator invariantBlockit = invariantBranches.begin();
+		if(invariantBlockit!=invariantBranches.end()){
+			std::vector<llvm::BasicBlock*>::iterator checkit = path.begin();
+			std::vector<llvm::BasicBlock*>::iterator loopit = loopPath.begin();
+/*			std::cerr<<"Check uncoverable path: ";
+			for(std::vector<llvm::BasicBlock*>::iterator BBit = loopPath.begin(),
+				BBitEnd = loopPath.end(); BBit != BBitEnd; BBit++){
+				std::cerr<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
+			}
+			std::cerr<< "              ";
+			std::cerr<< "for path: ";
+			for(std::vector<llvm::BasicBlock*>::iterator BBit = path.begin(),
+				BBitEnd = path.end(); BBit != BBitEnd; BBit++){
+				std::cerr<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
+			}
+			std::cerr<<std::endl;*/
+			/*
+			 * Go through each block of the current uncovered path and the current loop path.
+			 * If all the blocks until a invariant block is the same, and the block following the invariant block is different
+			 * return true. Because the block is invariant, the current is never going to be covered.
+			 * Do for every invariant block.
+			 */
+			while(checkit != path.end() && loopit != loopPath.end()){
+				if(*checkit != *loopit){
+					return false;
 				}
-				//check preds
-				for(llvm::const_pred_iterator pred = pred_begin(curr->getBB()); pred != pred_end(curr->getBB());pred++){
-					bool pred_in_cycle = false;
-					for(std::vector<int>::const_iterator k = i->begin(); k != i->end(); k++){//K loops over the cycle
-						if(tarjanNodes[*k]->getBB() == *pred){
-							// pred is inside the loop
-							pred_in_cycle = true;
-							break;
+				if(*checkit== *invariantBlockit){
+					checkit++;
+					loopit++;
+					if(checkit != path.end()){
+						if(loopit!=loopPath.end()){
+							if(*checkit!=*loopit){
+								return true;
+							}
 						}
 					}
-					if(!pred_in_cycle){
-						inCount++;
+					invariantBlockit++;
+					if(invariantBlockit==invariantBranches.end()){
+						return false;
 					}
+					break;
 				}
-				//FIXME: Should it be one?
-				if(outCount >= 1){
-					if(loop_exit_id == -1){
-						loop_exit_id = *j;
-						std::cout<<"Succ ID set to " << succNodeId << std::endl;
-					}
-					else{
-						std::cout<< "More than one exit found! The Succ ID is now " << succNodeId << std::endl;
-						loop_exit_id = *j;
-					}
-				}
-				//Assuming there is not cycle with size one.
-				if(inCount == 1){
-					if(loop_entry_id == -1){
-						loop_entry_id = *j;
-					}
-					else{
-						//std::cout<< "More than one entry found!" << std::endl;
-						loop_entry_id = -2;
-					}
-				}
-			}
-			if(loop_exit_id != -1 && loop_exit_id != -2 && loop_entry_id != -1 && loop_entry_id != -2){
-				//We found a loop!
-				Loop loop(loop_entry_id, loop_exit_id, *i);
-				loops.push_back(loop);
-			}
-			std::cout<< "=====================cycle finishes========================" << std::endl;
-		}
-	}
-};
-*/
-class KLoop{
-private:
-	llvm::Loop* loop;
-	std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > > pathsToExits;//For each exit, there is a vector of path.
-	std::vector<std::vector<llvm::BasicBlock*> > pathsToHead;
-	KLoop():loop(0){}
-public:
-	KLoop(llvm::Loop* _loop):loop(_loop){
-
-	}
-	~KLoop(){
-		//Fixme: clear needs work;
-		pathsToExits.clear();
-		pathsToHead.clear();
-	}
-
-	/*llvm::BasicBlock* selectPath(const std::vector<llvm::BasicBlock*>& currPath){
-		llvm::BasicBlock* ret = NULL;
-		for(std::map<std::vector<llvm::BasicBlock*>,bool>::iterator pathIt = paths.begin(),
-				pathItEnd=paths.end(); pathIt != pathItEnd; pathIt++){
-			//Loop through all the paths, if it is already taken, then don't need to explore again.
-			if(pathIt->second){
-				continue;
-			}
-			for(std::vector<llvm::BasicBlock*>::const_iterator inBlockIt = currPath.begin(), blockIt = pathIt->first.begin(),
-					inBlockItEnd = currPath.end(); (inBlockIt != inBlockItEnd) && (*inBlockIt == *blockIt); inBlockIt++, blockIt++  ){
-
+				checkit++;
+				loopit++;
 			}
 		}
-	}*/
-
-
-	llvm::Loop* getloop(){
-		return loop;
-	}
-
-	bool cycleExists(llvm::Loop* loop){
-
 		return false;
 	}
 };
+
+typedef std::vector<Path> Paths;
+/*class Paths{
+private:
+	std::vector<Path> pathsToHead;
+public:
+	Paths(){
+
+	}
+
+	virtual ~Paths(){
+		pathsToHead.clear();
+	}
+
+	void addPaths(std::vector<llvm::BasicBlock*> path){
+		pathsToHead.push_back(Path(path));
+	}
+
+	std::vector<Path>::iterator& begin(){
+		return pathsToHead.begin();
+	}
+
+	std::vector<Path>::iterator& end(){
+		return pathsToHead.end();
+	}
+
+	void erase(std::vector<Path>::iterator& p){
+		pathsToHead.erase(p);
+	}
+
+	bool empty(){
+		return pathsToHead.empty();
+	}
+};*/
 
 class KLoops{
 private:
 	std::vector<llvm::Loop*> kloops;
 	KLoops(){};
 	//std::map<llvm::Loop*,std::vector<std::vector<llvm::BasicBlock*> > > loopPaths;
-	std::map<llvm::Loop*, std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > > > pathsToExits;//For each exit, there is a vector of path.
-	std::map<llvm::Loop*, std::vector<std::vector<llvm::BasicBlock*> > > pathsToHead;
+	//std::map<llvm::Loop*, std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > > > pathsToExits;//For each exit, there is a vector of path.
+	std::map<llvm::Loop*, Paths> pathsToHead;
+	std::map<llvm::Loop*, std::set<llvm::Value*> > readList;
+	std::map<llvm::Loop*, std::set<llvm::Value*> > writtenList;
+	std::map<llvm::Loop*, std::set<llvm::Value*> > invariantList;
 	std::vector<llvm::Loop*> processedloops;
 
 	llvm::Function* getTargetFunction( llvm::Value *calledVal) {
@@ -258,6 +263,143 @@ public:
 		}
 	}
 
+	void genReadWrittenList(llvm::BasicBlock* currBlock, llvm::Loop* curr){
+		if(curr->contains(currBlock)){
+			for(llvm::BasicBlock::iterator iit = currBlock->begin(), iitEnd = currBlock->end();iit!=iitEnd;iit++){
+				if(llvm::LoadInst* lins = llvm::dyn_cast<llvm::LoadInst>(&*iit)){
+					llvm::Value* loaded = lins->getPointerOperand();
+					readList[curr].insert(loaded);
+				}
+				if(llvm::StoreInst* lins = llvm::dyn_cast<llvm::StoreInst>(&*iit)){
+					llvm::Value* loaded = lins->getPointerOperand();
+					writtenList[curr].insert(loaded);
+				}
+			}
+		}
+	}
+
+	void genInvariantList(llvm::Loop* curr){
+		//std::cout<<"Invariant List For Loop:" << curr << std::endl;
+		for(std::set<llvm::Value*>::iterator rit = readList[curr].begin(), ritEnd=readList[curr].end(); rit != ritEnd; rit++){
+			if(writtenList[curr].find(*rit) == writtenList[curr].end()){
+				invariantList[curr].insert(*rit);
+				//(*rit)->dump();
+			}
+		}
+	}
+
+	bool isInvariant(llvm::Loop* curr, llvm::Value* op,std::set<llvm::Value*>& invariants){
+		if(invariants.find(op) != invariants.end()){
+			return true;
+		}
+		if (dyn_cast<llvm::Constant>(op)) {
+			return true;
+		}
+		return false;
+	}
+
+	/*
+	 * Go through each path, and calculate the conditions at each branch with relationship of the invariants.
+	 */
+	void processPathConds(llvm::Loop* curr){
+		//go through pathsToHead and gen the conditions for the path to be coverable.
+		Paths* paths = &pathsToHead[curr];
+		std::set<llvm::Value*> invariants;
+		for(std::vector<Path>::iterator pit=paths->begin(), pitEnd= paths->end();
+				pit != pitEnd; pit++ ){
+			invariants = invariantList[curr];
+			//pit->dump();
+			for(std::vector<llvm::BasicBlock*>::iterator bit = pit->begin(), bitEnd=pit->end() ; bit != bitEnd ; bit++ ){
+				llvm::BasicBlock* currBlock = (*bit);
+				//go through each line of inst of bit, check if the inst operands are invariant and constant. If so, add inst to invariant list.
+				for(llvm::BasicBlock::iterator iit = currBlock->begin(), iitEnd = currBlock->end();iit!=iitEnd;iit++){
+					llvm::Instruction *i = &*iit;
+					//i->dump();
+					switch (i->getOpcode()) {
+						case llvm::Instruction::Switch:
+						//TODO: add support for switch command;
+						case llvm::Instruction::Br:{
+							llvm::BranchInst *bi = cast<llvm::BranchInst>(i);
+							if(!bi->isUnconditional()){
+								assert(bi->getCondition() == bi->getOperand(0) && "Wrong operand index!");
+								//i->dump();
+								if(invariants.find(bi->getCondition()) != invariants.end()){
+									//If the condition is invariant, we add it to the constraints of the loop path.
+									//std::cerr<<"$$$$$$$$$$$$$$$$$$$$$Condition Added"<< std::endl;
+									pit->addCond(currBlock);
+								}
+								//We need to check if the condition set
+							}
+							break;
+						}
+						//Binary Ops
+						case llvm::Instruction::Add:
+						case llvm::Instruction::Sub:
+						case llvm::Instruction::Mul:
+						case llvm::Instruction::UDiv:
+						case llvm::Instruction::SDiv:
+						case llvm::Instruction::URem:
+						case llvm::Instruction::SRem:
+						case llvm::Instruction::And:
+						case llvm::Instruction::Or:
+						case llvm::Instruction::Xor:
+						case llvm::Instruction::Shl:
+						case llvm::Instruction::LShr:
+						case llvm::Instruction::AShr:
+						case llvm::Instruction::ICmp:
+						case llvm::Instruction::FAdd:
+						case llvm::Instruction::FSub:
+						case llvm::Instruction::FMul:
+						case llvm::Instruction::FDiv:
+						case llvm::Instruction::FRem:
+						case llvm::Instruction::FCmp:
+						case llvm::Instruction::Store:{
+							llvm::Value* left=i->getOperand(0);
+							llvm::Value* right=i->getOperand(1);
+							if(isInvariant(curr, left, invariants) && isInvariant(curr, right, invariants)){
+								invariants.insert(i);
+								//std::cout<<"	Binary added"<<std::endl;
+								//i->dump();
+							}
+							break;
+						}
+						//Unary Ops;
+						case llvm::Instruction::Trunc:
+						case llvm::Instruction::ZExt:
+						case llvm::Instruction::SExt:
+						case llvm::Instruction::IntToPtr:
+						case llvm::Instruction::PtrToInt:
+						case llvm::Instruction::BitCast:
+						case llvm::Instruction::Load:
+						case llvm::Instruction::FPTrunc:
+						case llvm::Instruction::FPExt:
+						case llvm::Instruction::FPToUI:
+						case llvm::Instruction::FPToSI:
+						case llvm::Instruction::UIToFP:
+						case llvm::Instruction::SIToFP:{
+							if(isInvariant(curr,i->getOperand(0),invariants)){
+								invariants.insert(i);
+								//std::cout<<"		Unary added"<<std::endl;
+								//i->dump();
+							}
+							break;
+						}
+						default:{
+							break;
+						}
+					}
+				}
+			}
+
+			pit->dump();
+			/*
+			for(std::set<llvm::Value*>::iterator vi = invariants.begin(); vi != invariants.end();vi++){
+				(*vi)->dump();
+			}
+			*/
+		}
+	}
+
 	//FIXME: If loop has only one block, should not consider as a loop.
 	void calcPath(llvm::Loop* curr){
 		//We first check if all the subloops have been dealt with
@@ -267,6 +409,9 @@ public:
 			if(std::find(processedloops.begin(),processedloops.end(),(*subloop))== processedloops.end()){
 				//If subloop have not been processed yet.
 				calcPath(*subloop);
+				//We need to add the readlist and written list of the sub loop to the current loop.
+				readList[curr].insert(readList[*subloop].begin(),readList[*subloop].end());
+				writtenList[curr].insert(writtenList[*subloop].begin(),writtenList[*subloop].end());
 			}
 		}
 		//Now we need to process current loop.
@@ -277,6 +422,9 @@ public:
 		std::vector<llvm::BasicBlock*> headPath;
 		//Instead of pushing the header, we push the successors of the head.
 		llvm::BasicBlock* head = curr->getHeader();
+		//We need to update the readList and writtenList of the head block.
+		genReadWrittenList(head, curr);
+
 		llvm::TerminatorInst* headTerminator = head->getTerminator();
 		for(unsigned i = 0, j=headTerminator->getNumSuccessors(); i < j; i++){
 			headPath.push_back(headTerminator->getSuccessor(i));
@@ -296,6 +444,10 @@ public:
 			currPath = Q.front();
 			Q.pop();//currPath is the path until now.
 			currBlock = currPath.back();//currBlock is the current BasicBlock we need to explore.
+
+			//We need to update the readList and writtenList of the currBlock.
+			genReadWrittenList(currBlock, curr);
+
 			//Check if we find an exit.
 			if(std::find(exitBlocks.begin(),exitBlocks.end(),currBlock) != exitBlocks.end()&&
 					  !curr->contains(currBlock)){
@@ -321,7 +473,7 @@ public:
 						if(std::find(currPath.begin(),currPath.end(),*nextBlock) == currPath.end()){//If next is not on the current path, we assume that the head is not an exit.
 							currPath.push_back(*nextBlock);
 							Q.push(currPath);
-							currPath.pop_back();//Make sure if we have multiple nextblocks, we don't overwrite each other
+							currPath.pop_back();//Make sure if we have multiple next blocks, we don't overwrite each other
 						}
 					}
 					continue;
@@ -340,6 +492,10 @@ public:
 				}
 			}
 		}
+
+		//The difference of readList and writtenList is the invariant list.
+		genInvariantList(curr);
+
 		//We need to cross list all the path from the head to exit with the path from head to head
 		//std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > > ptoexits = pathsToExits[curr];
 		//std::vector<std::vector<llvm::BasicBlock*> > pathHtoH = pathsToHead[curr];
@@ -368,6 +524,9 @@ public:
 			}
 		}
 		*/
+
+		//Now we need to update the equvalence relationship for at each branch inst.
+		processPathConds(curr);
 		processedloops.push_back(curr);
 	}
 
@@ -388,23 +547,21 @@ public:
 
 	void printLoop(){
 		for(std::vector<llvm::Loop*>::iterator kloop = kloops.begin(),end=kloops.end(); kloop != end;kloop++){
-			(*kloop)->dump();
+			std::vector<llvm::BasicBlock*> bbs = (*kloop)->getBlocks();
+			for(std::vector<llvm::BasicBlock*>::iterator bit = bbs.begin(),bitEnd=bbs.end();bit!=bitEnd;bit++){
+				std::cout<<*bit<<":"<<std::endl;
+				(*bit)->dump();
+			}
 		}
 	}
 
 	void printPath(){
-		for(std::map<llvm::Loop*,std::vector<std::vector<llvm::BasicBlock*> > >::iterator paths = pathsToHead.begin(),
+		for(std::map<llvm::Loop*,Paths>::const_iterator paths = pathsToHead.begin(),
 				pathEnd = pathsToHead.end(); paths != pathEnd; paths++){
 			std::cout<< "Path for loop: " << paths->first << " at line: " << paths->first->getHeader()->begin()->getDebugLoc().getLine() << std::endl;
-			for(std::vector<std::vector<llvm::BasicBlock*> >::iterator path = paths->second.begin(),
+			for(std::vector<Path>::const_iterator path = paths->second.begin(),
 					pathEnd = paths->second.end(); path != pathEnd; path++){
-				std::cout<<"	";
-				for(std::vector<llvm::BasicBlock*>::iterator BBit = path->begin(),
-						BBitEnd = path->end(); BBit != BBitEnd; BBit++){
-					std::cout<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
-					(*BBit)->dump();
-				}
-				std::cout<<std::endl;
+				path->dump();
 			}
 		}
 	}
@@ -413,12 +570,33 @@ public:
 		return processedloops;
 	}
 
-	const std::map<llvm::Loop*,std::vector<std::vector<llvm::BasicBlock*> > > &getPathsH2H(){
+	const std::map<llvm::Loop*,Paths> &getPathsH2H(){
 		return pathsToHead;
 	}
 
-	const std::map<llvm::Loop*, std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > > > &getPathsH2E(){
+/*	const std::map<llvm::Loop*, std::map<llvm::BasicBlock*, std::vector<std::vector<llvm::BasicBlock*> > > > &getPathsH2E(){
 		return pathsToExits;
+	}*/
+
+	void printReadWritten(){
+		for(std::map<llvm::Loop*, std::set<llvm::Value*> >::iterator it = readList.begin(), itEnd=readList.end();it != itEnd; it++){
+			for(std::set<llvm::Value*>::iterator sit = it->second.begin(), sitEnd=it->second.end(); sit != sitEnd; sit++){
+				(*sit)->dump();
+			}
+			std::cout<<"======================="<<std::endl;
+		}
+		for(std::map<llvm::Loop*, std::set<llvm::Value*> >::iterator it = writtenList.begin(), itEnd=writtenList.end();it != itEnd; it++){
+			for(std::set<llvm::Value*>::iterator sit = it->second.begin(), sitEnd=it->second.end(); sit != sitEnd; sit++){
+				(*sit)->dump();
+			}
+			std::cout<<"=============================="<<std::endl;
+		}
+		for(std::map<llvm::Loop*, std::set<llvm::Value*> >::iterator it = invariantList.begin(), itEnd=invariantList.end();it != itEnd; it++){
+			for(std::set<llvm::Value*>::iterator sit = it->second.begin(), sitEnd=it->second.end(); sit != sitEnd; sit++){
+				(*sit)->dump();
+			}
+			std::cout<<"============================================="<<std::endl;
+		}
 	}
 };
 }
