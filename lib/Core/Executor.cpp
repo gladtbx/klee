@@ -1580,22 +1580,24 @@ static inline const llvm::fltSemantics * fpWidthToSemantics(unsigned width) {
 void Executor::executeInstruction(ExecutionState &state, KInstruction *ki) {
   Instruction *i = ki->inst;
   //Add loop head info to ki, so we don't need to search for loop each time.
-  if(LoopReduction){
-	  //We only do process at the beginning of a block.
-	  llvm::BasicBlock* kblock = ki->inst->getParent();
-	  if(ki->inst==kblock->begin()){
-		  //We need to check if the block has been hit before, if not so , we need to remove it from the unvisited block list.
-		  llvm::Function* kfunction = kblock->getParent();
-		  if(kmodule->unvisitedBlocks[kfunction].size()){
-			  std::vector<const llvm::BasicBlock*>::iterator unvisitedBlock = std::find(kmodule->unvisitedBlocks[kfunction].begin(),
-					  kmodule->unvisitedBlocks[kfunction].end(),kblock);
-			  if(unvisitedBlock != kmodule->unvisitedBlocks[kfunction].end()){
-				  kmodule->unvisitedBlocks[kfunction].erase(unvisitedBlock);
-				  if(kmodule->unvisitedBlocks[kfunction].size()== 0){
-					  kmodule->unvisitedBlocks.erase(kfunction);
-				  }
+  llvm::BasicBlock* kblock = ki->inst->getParent();
+  if(ki->inst==kblock->begin()){
+	  //We need to check if the block has been hit before, if not so , we need to remove it from the unvisited block list.
+	  llvm::Function* kfunction = kblock->getParent();
+	  if(kmodule->unvisitedBlocks[kfunction].size()){
+		  std::vector<const llvm::BasicBlock*>::iterator unvisitedBlock = std::find(kmodule->unvisitedBlocks[kfunction].begin(),
+				  kmodule->unvisitedBlocks[kfunction].end(),kblock);
+		  if(unvisitedBlock != kmodule->unvisitedBlocks[kfunction].end()){
+			  kmodule->unvisitedBlocks[kfunction].erase(unvisitedBlock);
+			  if(kmodule->unvisitedBlocks[kfunction].size()== 0){
+				  kmodule->unvisitedBlocks.erase(kfunction);
 			  }
 		  }
+	  }
+  }
+  if(LoopReduction){
+	  //We only do process at the beginning of a block.
+	  if(ki->inst==kblock->begin()){
 		  if(state.stack.back().loopPath.size()){
 			  //std::cout<< "Currently at block:" << ki->inst->getParent() <<":" <<ki->inst->getDebugLoc().getLine()<<std::endl;
 			  //If we are currently in a loop.
@@ -4188,7 +4190,7 @@ bool Executor::allCovered(std::vector<ExecutionState*>& bstates){
 
 bool Executor::allCovered(){
 	//FIXME: We should add a structure for each state to record which loops are executed already.
-	for(std::vector<llvm::Loop*>::iterator loopIt = uncoveredloops.begin(), loopItEnd=uncoveredloops.end();
+	/*	for(std::vector<llvm::Loop*>::iterator loopIt = uncoveredloops.begin(), loopItEnd=uncoveredloops.end();
 			loopIt != loopItEnd; loopIt++){
 		//First find the uncovered path of the uncovered loop
 		Paths* uncoveredPaths = &loopPathsH2H[*loopIt];
@@ -4218,7 +4220,7 @@ bool Executor::allCovered(){
 			}
 		}
 	}
-/*	if(uncoveredloops.size()){
+	if(uncoveredloops.size()){
 		return false;
 	}*/
 	/*
