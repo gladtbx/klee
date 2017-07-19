@@ -564,6 +564,7 @@ public:
 //  Expr::Width getWidthForLLVMType(LLVM_TYPE_Q llvm::Type *type) const;
 
   bool allCovered(std::vector<ExecutionState*>&);
+  bool allCovered();
 
   Paths& getUncoveredPaths(llvm::Loop* loop){
 	  return loopPathsH2H[loop];

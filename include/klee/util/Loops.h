@@ -74,7 +74,7 @@ public:
 			std::cout<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
 			//(*BBit)->dump();
 		}
-		std::cout<< std::endl<<"Invariant Branches:              ";
+		std::cout<< std::endl<<"		Invariant Branches:              ";
 		for(std::vector<llvm::BasicBlock*>::const_iterator invit = invariantBranches.begin(),
 				invitEnd=invariantBranches.end();invit != invitEnd; invit++){
 			std::cout<<*invit<<"  ";
@@ -87,7 +87,7 @@ public:
 		if(invariantBlockit!=invariantBranches.end()){
 			std::vector<llvm::BasicBlock*>::iterator checkit = path.begin();
 			std::vector<llvm::BasicBlock*>::iterator loopit = loopPath.begin();
-/*			std::cerr<<"Check uncoverable path: ";
+		/*	std::cerr<<"Check uncoverable path: ";
 			for(std::vector<llvm::BasicBlock*>::iterator BBit = loopPath.begin(),
 				BBitEnd = loopPath.end(); BBit != BBitEnd; BBit++){
 				std::cerr<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
@@ -110,11 +110,20 @@ public:
 					return false;
 				}
 				if(*checkit== *invariantBlockit){
+					//std::cerr<<"1 ";
 					checkit++;
 					loopit++;
 					if(checkit != path.end()){
+						//std::cerr<<"2 ";
 						if(loopit!=loopPath.end()){
+							//std::cerr<<"3 ";
 							if(*checkit!=*loopit){
+								//std::cerr<<"4 ";
+								/*for(std::vector<llvm::BasicBlock*>::iterator BBit = path.begin(),
+									BBitEnd = path.end(); BBit != BBitEnd; BBit++){
+									std::cerr<< *BBit<<":" << (*BBit)->begin()->getDebugLoc().getLine() << "->" ;
+								}
+								std::cerr<<" marked "<<std::endl;*/
 								return true;
 							}
 						}
@@ -123,7 +132,7 @@ public:
 					if(invariantBlockit==invariantBranches.end()){
 						return false;
 					}
-					break;
+					continue;
 				}
 				checkit++;
 				loopit++;
@@ -289,10 +298,115 @@ public:
 	}
 
 	bool isInvariant(llvm::Loop* curr, llvm::Value* op,std::set<llvm::Value*>& invariants){
+		//std::cerr<<op<<" isInvariant?";
 		if(invariants.find(op) != invariants.end()){
+			//std::cerr<<"true!"<<std::endl;
 			return true;
 		}
 		if (dyn_cast<llvm::Constant>(op)) {
+			//std::cerr<<"true!"<<std::endl;
+			return true;
+		}
+		//std::cerr<<"false!"<<std::endl;
+		return false;
+	}
+
+	/*
+	 * Trace back:
+	 * After parse condition, we need to trace back the path to find invariant.
+	 * Especially for ld inst.
+	 */
+	void traceBack(llvm::Value* inst,std::set<llvm::Value*>& invariants){
+		if(llvm::LoadInst* i = dyn_cast<llvm::LoadInst>(inst)){
+			invariants.insert(i->getOperand(0));
+		}
+	}
+
+
+	/*
+	 * When one side of a branch is taken, we need to examine if additional invariant is generated.
+	 * For ex, we take the true branch of condition a==b, a is not invariant and b is an invariant.
+	 * We need to add a as invariant to the latter part of the path, if a is not re-written later.
+	 *
+	 * Tough parts are:
+	 * 1) condition might be and/or of several sub-conditions. a==b && c!=d cannot
+	 * be treated the same as a==b || c!=d.
+	 * 2) Set the scope of a as an invariant, ie, from which instruction to which instruction.
+	 *
+	 * Basically a has to be taken out of the invariant list whenever it is written by an non-invariant value.
+	 */
+	void parseCondition(llvm::Loop* loop, llvm::Value* cond, bool pathTaken, std::set<llvm::Value*>& invariants){
+		if(llvm::Instruction* inst = dyn_cast<llvm::Instruction>(cond)){
+			//std::cerr<<"!!!!!!!ParseCondition:" << std::endl;
+			//inst->dump();
+			switch (inst->getOpcode()) {
+				case llvm::Instruction::ICmp:{
+					llvm::CmpInst *ci = cast<llvm::CmpInst>(inst);
+					llvm::ICmpInst *ii = cast<llvm::ICmpInst>(ci);
+					// std::cerr<<ci->getOperand(0);
+					// std::cerr<<":"<<ci->getOperand(1)<<std::endl;
+					if(isInvariant(loop, ci->getOperand(0), invariants) ^ isInvariant(loop, ci->getOperand(1),invariants)){
+						//std::cerr<<"Only one invariant found!"<<std::endl;
+						switch(ii->getPredicate()) {
+							case llvm::ICmpInst::ICMP_EQ: {
+								if(pathTaken){
+									//std::cerr<<"			Condition Invariant Added!"<<std::endl;
+									//ci->getOperand(0)->dump();
+									//ci->getOperand(1)->dump();
+									invariants.insert(ci->getOperand(0));
+									invariants.insert(ci->getOperand(1));
+									traceBack(ci->getOperand(0),invariants);
+									traceBack(ci->getOperand(1),invariants);
+								}
+								break;
+							}
+							case llvm::ICmpInst::ICMP_NE: {
+								if(!pathTaken){
+									//std::cerr<<"			Condition Invariant Added!"<<std::endl;
+									invariants.insert(ci->getOperand(0));
+									invariants.insert(ci->getOperand(1));
+									//ci->getOperand(0)->dump();
+									//ci->getOperand(1)->dump();
+									traceBack(ci->getOperand(0),invariants);
+									traceBack(ci->getOperand(1),invariants);
+								}
+								break;
+							}
+							default:
+								break;
+						}
+					}
+					break;
+				}
+				case llvm::Instruction::And:{
+					if(pathTaken){
+						//For and op, both cond must be true for and to be true.
+						parseCondition(loop, inst->getOperand(0), pathTaken, invariants);
+						parseCondition(loop, inst->getOperand(1), pathTaken, invariants);
+					}
+					break;
+				}
+				case llvm::Instruction::Or:{
+					if(!pathTaken){
+						//For or op, both cond must be false for or to be false.
+						parseCondition(loop, inst->getOperand(0), pathTaken, invariants);
+						parseCondition(loop, inst->getOperand(1), pathTaken, invariants);
+					}
+					break;
+				}
+				default:
+					break;
+			}
+		}
+	}
+
+	/*
+	 * FIXME: add support for switch commands.
+	 */
+
+	bool pathTaken(llvm::BasicBlock* curr, llvm::BasicBlock* next){
+		llvm::TerminatorInst* terInst = curr->getTerminator();
+		if(terInst->getSuccessor(0) == next){
 			return true;
 		}
 		return false;
@@ -311,6 +425,12 @@ public:
 			//pit->dump();
 			for(std::vector<llvm::BasicBlock*>::iterator bit = pit->begin(), bitEnd=pit->end() ; bit != bitEnd ; bit++ ){
 				llvm::BasicBlock* currBlock = (*bit);
+				//check which branch is the taken at the end of current currBlock.
+				if(bit+1 == bitEnd){
+				//We are the last block already, no need to process.
+					break;
+				}
+
 				//go through each line of inst of bit, check if the inst operands are invariant and constant. If so, add inst to invariant list.
 				for(llvm::BasicBlock::iterator iit = currBlock->begin(), iitEnd = currBlock->end();iit!=iitEnd;iit++){
 					llvm::Instruction *i = &*iit;
@@ -322,7 +442,18 @@ public:
 							llvm::BranchInst *bi = cast<llvm::BranchInst>(i);
 							if(!bi->isUnconditional()){
 								assert(bi->getCondition() == bi->getOperand(0) && "Wrong operand index!");
-								//i->dump();
+								/*
+								i->dump();
+								std::cerr<<"@@@@@@@@@@@@@@@Current invariants:"<<std::endl;
+								std::cerr<<&invariants<<" has size: "<<invariants.size()<<std::endl;
+
+								for(std::set<llvm::Value*>::iterator invit=invariants.begin(), invitEnd=invariants.end();
+										invit!=invitEnd;invit++){
+									(*invit)->dump();
+									std::cerr<<(*invit)<<std::endl;
+								}
+								std::cerr<<"@@@@@@@@@@@@@@@"<<std::endl;*/
+								parseCondition(curr, bi->getCondition(),pathTaken(currBlock,*(bit+1)),invariants);
 								if(invariants.find(bi->getCondition()) != invariants.end()){
 									//If the condition is invariant, we add it to the constraints of the loop path.
 									//std::cerr<<"$$$$$$$$$$$$$$$$$$$$$Condition Added"<< std::endl;
@@ -335,6 +466,9 @@ public:
 							break;
 						}
 						//Binary Ops
+						case llvm::Instruction::ICmp:
+						case llvm::Instruction::FCmp:
+						//FIXME:Maybe add support for FCmp?
 						case llvm::Instruction::Add:
 						case llvm::Instruction::Sub:
 						case llvm::Instruction::Mul:
@@ -348,20 +482,38 @@ public:
 						case llvm::Instruction::Shl:
 						case llvm::Instruction::LShr:
 						case llvm::Instruction::AShr:
-						case llvm::Instruction::ICmp:
 						case llvm::Instruction::FAdd:
 						case llvm::Instruction::FSub:
 						case llvm::Instruction::FMul:
 						case llvm::Instruction::FDiv:
-						case llvm::Instruction::FRem:
-						case llvm::Instruction::FCmp:
+						case llvm::Instruction::FRem:{
+							llvm::Value* left=i->getOperand(0);
+							llvm::Value* right=i->getOperand(1);
+							if(isInvariant(curr, right, invariants)){
+									if(isInvariant(curr, left, invariants)){
+										invariants.insert(i);
+										//std::cout<<"	Binary added"<<std::endl;
+										//i->dump();
+									}
+							}
+							break;
+						}
 						case llvm::Instruction::Store:{
 							llvm::Value* left=i->getOperand(0);
 							llvm::Value* right=i->getOperand(1);
-							if(isInvariant(curr, left, invariants) && isInvariant(curr, right, invariants)){
-								invariants.insert(i);
-								//std::cout<<"	Binary added"<<std::endl;
-								//i->dump();
+							if(isInvariant(curr, right, invariants)){
+									if(isInvariant(curr, left, invariants)){
+										invariants.insert(i);
+										//std::cout<<"	Binary added"<<std::endl;
+										//i->dump();
+									}else{
+										//If we are writing to an invariant var with a non-invariant value, we should
+										//take the invariant out of the list.
+										//This can only happen when an invariant is added because of condition checking.
+										//See parseCondition for details.
+										//std::cerr<<right<<" erased"<<std::endl;
+										invariants.erase(right);
+									}
 							}
 							break;
 						}
@@ -381,8 +533,8 @@ public:
 						case llvm::Instruction::SIToFP:{
 							if(isInvariant(curr,i->getOperand(0),invariants)){
 								invariants.insert(i);
-								//std::cout<<"		Unary added"<<std::endl;
-								//i->dump();
+								//std::cerr<<"		Unary added"<<std::endl;
+								//std::cerr<<i<<std::endl;
 							}
 							break;
 						}
@@ -393,7 +545,7 @@ public:
 				}
 			}
 
-			pit->dump();
+			//pit->dump();
 			/*
 			for(std::set<llvm::Value*>::iterator vi = invariants.begin(); vi != invariants.end();vi++){
 				(*vi)->dump();
@@ -593,8 +745,8 @@ public:
 			}
 			std::cout<<"=============================="<<std::endl;
 		}
-		for(std::map<llvm::Loop*, std::set<llvm::Value*> >::iterator it = invariantList.begin(), itEnd=invariantList.end();it != itEnd; it++){
-			for(std::set<llvm::Value*>::iterator sit = it->second.begin(), sitEnd=it->second.end(); sit != sitEnd; sit++){
+		for(std::map<llvm::Loop*, std::set<llvm::Value*> >::const_iterator it = invariantList.begin(), itEnd=invariantList.end();it != itEnd; it++){
+			for(std::set<llvm::Value*>::const_iterator sit = it->second.begin(), sitEnd=it->second.end(); sit != sitEnd; sit++){
 				(*sit)->dump();
 			}
 			std::cout<<"============================================="<<std::endl;

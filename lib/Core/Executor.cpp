@@ -3754,7 +3754,7 @@ void Executor::runFunctionAsMain(Function *f,
   if (statsTracker)
     statsTracker->framePushed(*state, 0);
 
-  if(LoopReduction)
+  //if(LoopReduction)
 	  processLoopInfo(&f->getEntryBlock());
   assert(arguments.size() == f->arg_size() && "wrong number of arguments");
   for (unsigned i = 0, e = f->arg_size(); i != e; ++i)
@@ -4044,9 +4044,9 @@ void Executor::processLoopInfo(llvm::BasicBlock* root){
 	}
 	loopPathsH2H = kloops->getPathsH2H();
 	uncoveredloops = kloops->getLoops();
-	kloops->printLoop();
+	//kloops->printLoop();
 
-	kloops->printPath();
+	//kloops->printPath();
 }
 
 bool Executor::allCovered(std::vector<ExecutionState*>& bstates){
@@ -4057,8 +4057,9 @@ bool Executor::allCovered(std::vector<ExecutionState*>& bstates){
 		Paths* uncoveredPaths = &loopPathsH2H[*loopIt];
 		for(std::vector<Path>::iterator uncoveredPathit = uncoveredPaths->begin(), uncoveredPathitend = uncoveredPaths->end();
 						uncoveredPathit != uncoveredPathitend; uncoveredPathit++){
+			int se = 0;
 			for(std::vector<ExecutionState*>::iterator bIt = bstates.begin(), bItEnd = bstates.end();
-					bIt != bItEnd; bIt++){
+					bIt != bItEnd; bIt++,se++){
 				//FIXME: Assuming there is no recursion.
 				std::vector<loopPathInfo>* loopPath = &(*bIt)->stack.back().loopPath;
 				//We need to find the loopPathInfo for the loop loopIt.
@@ -4071,6 +4072,7 @@ bool Executor::allCovered(std::vector<ExecutionState*>& bstates){
 							continue;
 						}
 						else{
+							std::cerr<<"All covered not finished yet! "<< bstates.size() << " bstates left! " << se << " examined"<<std::endl;
 							std::iter_swap(bIt,--bItEnd);
 							return false;
 						}
@@ -4166,6 +4168,135 @@ bool Executor::allCovered(std::vector<ExecutionState*>& bstates){
 					if(targetState+1 != bstates.end()){
 						std::rotate(targetState, targetState + 1, bstates.end());
 					}
+					return false;
+				}
+			}
+			if(!functionVisited){
+				continue;
+			}
+			//return false;
+		}
+	}
+	return true;
+}
+
+
+bool Executor::allCovered(){
+	//FIXME: We should add a structure for each state to record which loops are executed already.
+	for(std::vector<llvm::Loop*>::iterator loopIt = uncoveredloops.begin(), loopItEnd=uncoveredloops.end();
+			loopIt != loopItEnd; loopIt++){
+		//First find the uncovered path of the uncovered loop
+		Paths* uncoveredPaths = &loopPathsH2H[*loopIt];
+		for(std::vector<Path>::iterator uncoveredPathit = uncoveredPaths->begin(), uncoveredPathitend = uncoveredPaths->end();
+						uncoveredPathit != uncoveredPathitend; uncoveredPathit++){
+			int se = 0;
+			for(std::set<ExecutionState*>::iterator bIt = states.begin(), bItEnd = states.end();
+					bIt != bItEnd; bIt++,se++){
+				//FIXME: Assuming there is no recursion.
+				std::vector<loopPathInfo>* loopPath = &(*bIt)->stack.back().loopPath;
+				//We need to find the loopPathInfo for the loop loopIt.
+				for(std::vector<loopPathInfo>::iterator lpIt = loopPath->begin(), lpItEnd=loopPath->end();
+						lpIt != lpItEnd; lpIt++){
+					if(lpIt->loop == *loopIt){
+						//Now we find the loop the has uncovered loops.
+						if(std::find(lpIt->uncoverablePaths.begin(),lpIt->uncoverablePaths.end(),&*uncoveredPathit) != lpIt->uncoverablePaths.end()){
+							//The path is uncoverable for the current bstate.
+							continue;
+						}
+						else{
+							//std::cerr<<"All covered not finished yet! "<< states.size() << " bstates left! " << se << " examined"<<std::endl;
+							//std::iter_swap(bIt,--bItEnd);
+							return false;
+						}
+					}
+				}
+			}
+		}
+	}
+/*	if(uncoveredloops.size()){
+		return false;
+	}*/
+	/*
+	 * Go through all the functions, and check if the blocks have been visited.
+	 * If there is any block that hasn't been visited, return false.
+	 */
+	double timeout = coreSolverTimeout;
+	for(std::map<const llvm::Function*,std::vector<const llvm::BasicBlock*> >::iterator it = kmodule->unvisitedBlocks.begin()
+			, ie = kmodule->unvisitedBlocks.end();it != ie; it++){
+		if(it->second.size() && std::strcmp(it->first->getName().str().c_str(),"main") != 0){
+			bool functionVisited = true;
+			for(std::vector<const llvm::BasicBlock*>::iterator bit = it->second.begin(), bitEnd=it->second.end(); bit != bitEnd; bit++){
+				if(&(it->first->getEntryBlock()) == (*bit)){
+					//Unvisited block is head of function, all blocks for the current function should not be visited.
+					functionVisited = false;
+					break;
+				}
+				//If we don't actively prune states, we should return false now.
+				if(!ActivePruning){
+					return false;
+				}
+				bool predVisited=false;
+				const llvm::BasicBlock* predecessor;
+				for(llvm::const_pred_iterator pbit = llvm::pred_begin(*bit), pbitEnd=llvm::pred_end(*bit);pbit!=pbitEnd;pbit++){
+					predecessor = *pbit;
+					if(std::find(it->second.begin(),it->second.end(),predecessor) == it->second.end()){
+						//Predecessor found inside unvisited block.
+						predVisited=true;
+						break;
+					}
+				}
+				if(!predVisited){
+					continue;
+				}
+				//Now we have a bit that one of its pred is visited. We need to find if it is a branch/switch ins.
+			    const llvm::Instruction* inst = predecessor->getTerminator();
+			    bool statePicked=false;
+			    std::set<ExecutionState*>::iterator targetState;
+				for(std::set<ExecutionState*>::iterator sit = states.begin(), sitEnd=states.end();sit != sitEnd;sit++){
+				    ref<Expr> cond;
+				    bool pathtotake;
+					switch (inst->getOpcode()) {
+				    case Instruction::Br :{
+				    	const BranchInst *bi = cast<BranchInst>(inst);
+				    	if(bi->getSuccessor(0)== *bit){
+				    		pathtotake=0;
+				    	}
+				    	else{
+				    		pathtotake=1;
+				    	}
+				    	assert(bi->getCondition() == bi->getOperand(0) &&
+							 "Wrong operand index!");
+				    	cond = eval((*sit)->pc, 0,**sit).value;
+				    	break;
+				    }
+				  //  case Instruction::Switch :{
+				    	//Fixme: Switch not supported now.
+				   // }
+				    default:
+				    	statePicked=true;
+				    	targetState=sit;
+				    	break;
+				    }
+					if(statePicked){
+						break;
+					}
+					Solver::Validity res;
+					solver->setTimeout(timeout);
+					bool success = solver->evaluate(**sit, cond, res);
+					solver->setTimeout(0);
+					if (!success) {
+						//Timed out
+				    	statePicked=true;
+				    	targetState=sit;
+						break;
+					}
+					if ((res==Solver::True && pathtotake==1) || (res==Solver::False && pathtotake==0) ){
+						//FIXME: for switch, more logic needed.
+						//Current state can not cover the required block.
+						continue;
+					}
+				}
+				if(statePicked){
 					return false;
 				}
 			}
