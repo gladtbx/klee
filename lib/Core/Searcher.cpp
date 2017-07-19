@@ -175,9 +175,10 @@ RandomSearcher::update(ExecutionState *current,
 
 ///
 
-WeightedRandomSearcher::WeightedRandomSearcher(WeightType _type)
+WeightedRandomSearcher::WeightedRandomSearcher(WeightType _type, Executor &_executor)
   : states(new DiscretePDF<ExecutionState*>()),
-    type(_type) {
+    type(_type),
+    executor(_executor){
   switch(type) {
   case Depth: 
     updateWeights = false;
@@ -262,7 +263,7 @@ void WeightedRandomSearcher::update(
 }
 
 bool WeightedRandomSearcher::empty() { 
-  return states->empty(); 
+  return (states->empty() || executor.allCovered());
 }
 
 ///
@@ -653,8 +654,10 @@ bool LoopReductionSearcher::allCovered(){
 }
 
 bool LoopReductionSearcher::empty(){
-	if(!states.empty())
+	if(!states.empty()){
+		std::cerr<<states.size() << " states left!"<<std::endl;
 		return false;
+	}
 	if(blocked_states.size()){
 		return allCovered();
 	}
@@ -704,15 +707,15 @@ void LoopReductionSearcher::update(ExecutionState *current,
 					!=currLoop->uncoverablePaths.end()){
 					//std::cerr<<"Uncovered Path Eliminated!" << std::endl;
 					continue;
-				}
-/*				std::cout<< "Uncovered Path:";
+				}/*
+				std::cout<< "Uncovered Path:";
 				for(std::vector<llvm::BasicBlock*>::iterator uncoveredBlockit = uncoveredPathit->begin(), uncoveredBlockitend = uncoveredPathit->end();
 					  uncoveredBlockit != uncoveredBlockitend; uncoveredBlockit++){
-					(*uncoveredBlockit)->dump();
+					//(*uncoveredBlockit)->dump();
 					std::cout<< *uncoveredBlockit<<":"<<(*uncoveredBlockit)->front().getDebugLoc().getLine()<< " -> " ;
 				}
-			  	std::cout<<std::endl;
-*/
+			  	std::cout<<std::endl;*/
+
 				if(currLoop->path.size()<=uncoveredPathit->size()){
 					if(std::equal(currLoop->path.begin(),currLoop->path.end(),uncoveredPathit->begin())){
 						//Current path is possible to cover uncovered states
