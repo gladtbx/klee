@@ -4226,6 +4226,7 @@ bool Executor::allCovered(){
 	for(std::map<const llvm::Function*,std::vector<const llvm::BasicBlock*> >::iterator it = kmodule->unvisitedBlocks.begin()
 			, ie = kmodule->unvisitedBlocks.end();it != ie; it++){
 		if(it->second.size() && std::strcmp(it->first->getName().str().c_str(),"main") != 0){
+			return false;
 			bool functionVisited = true;
 			for(std::vector<const llvm::BasicBlock*>::iterator bit = it->second.begin(), bitEnd=it->second.end(); bit != bitEnd; bit++){
 				if(&(it->first->getEntryBlock()) == (*bit)){
