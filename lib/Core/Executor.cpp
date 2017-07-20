@@ -2917,7 +2917,7 @@ void Executor::run(ExecutionState &initialState) {
   searcher->update(0, newStates, std::vector<ExecutionState *>());
 
   while (!states.empty() && !haltExecution) {
-	if(LoopReduction && searcher->empty()){
+	if(searcher->empty()){
 		break;
 	}
     ExecutionState &state = searcher->selectState();
