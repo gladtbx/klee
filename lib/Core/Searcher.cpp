@@ -434,14 +434,11 @@ bool LoopReductionSearcher::allCovered(){
 }
 
 bool LoopReductionSearcher::empty(){
-	if(!states.empty()){
-		std::cerr<<states.size() << " states left!"<<std::endl;
-		return false;
+	if(states.empty()&&blocked_states.empty()){
+		return true;
+	}else{
+		return executor.allCovered();
 	}
-	if(blocked_states.size()){
-		return allCovered();
-	}
-	return true;
 }
 
 ExecutionState &LoopReductionSearcher::selectState(){
