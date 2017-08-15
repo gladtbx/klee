@@ -4230,6 +4230,10 @@ bool Executor::allCovered(){
 	double timeout = coreSolverTimeout;
 	for(std::map<const llvm::Function*,std::vector<const llvm::BasicBlock*> >::iterator it = kmodule->unvisitedBlocks.begin()
 			, ie = kmodule->unvisitedBlocks.end();it != ie; it++){
+		//If we have set the target function, then we need to check if the unvisited block is within one of the target functions.
+		if(!ifTargetFunction(it->first)){
+			continue;
+		}
 		if(it->second.size() && std::strcmp(it->first->getName().str().c_str(),"main") != 0){
 			return false;
 			bool functionVisited = true;
