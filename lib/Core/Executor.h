@@ -471,6 +471,9 @@ private:
 	  }
 	  std::string functionName=f->getName();
 	  std::vector<std::string> targetFunctions = interpreterHandler->getTargetFunction();
+	  if(targetFunctions.empty()){
+		  return true;
+	  }
 	  for(std::vector<std::string>::iterator it= targetFunctions.begin(), ie = targetFunctions.end(); it != ie; it++){
 		  if(functionName == *it)
 		  	 return true;
