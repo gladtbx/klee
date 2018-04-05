@@ -20,7 +20,8 @@ Solver *constructSolverChain(Solver *coreSolver,
                              std::string querySMT2LogPath,
                              std::string baseSolverQuerySMT2LogPath,
                              std::string queryKQueryLogPath,
-                             std::string baseSolverQueryKQueryLogPath) {
+                             std::string baseSolverQueryKQueryLogPath,
+                             std::set<ref<Expr> > cachedConstraints) {
   Solver *solver = coreSolver;
 
   if (queryLoggingOptions.isSet(SOLVER_KQUERY)) {
@@ -46,9 +47,9 @@ Solver *constructSolverChain(Solver *coreSolver,
   if (UseCexCache)
     solver = createCexCachingSolver(solver);
 
-  if (UseCache)
-    solver = createCachingSolver(solver);
-
+  if (UseCache){
+	  solver = createCachingSolver(solver,cachedConstraints);
+  }
   if (UseIndependentSolver)
     solver = createIndependentSolver(solver);
 

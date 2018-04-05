@@ -28,6 +28,7 @@ klee_add_component(kleaverSolver
   ValidatingSolver.cpp
   Z3Builder.cpp
   Z3Solver.cpp
+  GreenSolver.cpp
 )
 
 set(LLVM_COMPONENTS

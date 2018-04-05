@@ -71,6 +71,8 @@ namespace klee {
                            const Array * const* evalArraysBegin = 0,
                            const Array * const* evalArraysEnd = 0,
                            bool printArrayDecls = true);
+
+    static void printConstraintsAsCache(llvm::raw_ostream &os, const ConstraintManager &constraints);
   };
 
 }

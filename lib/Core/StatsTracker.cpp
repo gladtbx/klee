@@ -414,6 +414,7 @@ void StatsTracker::writeStatsHeader() {
              << "'ResolveTime',"
              << "'QueryCexCacheMisses',"
              << "'QueryCexCacheHits',"
+             << "'CachedConstraintsHit',"
 #ifdef DEBUG
 	     << "'ArrayHashTime',"
 #endif
@@ -446,6 +447,7 @@ void StatsTracker::writeStatsLine() {
              << "," << stats::resolveTime / 1000000.
              << "," << stats::queryCexCacheMisses
              << "," << stats::queryCexCacheHits
+             << "," << stats::cachedConstraintsHit
 #ifdef DEBUG
              << "," << stats::arrayHashTime / 1000000.
 #endif

@@ -104,6 +104,14 @@ void KCommandLine::HideUnrelatedOptions(
     HideUnrelatedOptions(*i);
 }
 
+llvm::cl::list<std::string> LoadCacheFile("loadCacheFile",
+                llvm::cl::desc("Specify a cache file to load"),
+                llvm::cl::value_desc("cache file"));
+
+llvm::cl::list<std::string> LoadCacheDir("loadCacheDir",
+                llvm::cl::desc("Specify a cache dir to load"),
+                llvm::cl::value_desc("cache dir"));
+
 #ifdef ENABLE_METASMT
 
 #ifdef METASMT_DEFAULT_BACKEND_IS_BTOR
@@ -145,45 +153,56 @@ MetaSMTBackend("metasmt-backend",
 #define STP_IS_DEFAULT_STR " (default)"
 #define METASMT_IS_DEFAULT_STR ""
 #define Z3_IS_DEFAULT_STR ""
+#define GREEN_IS_DEFAULT_STR ""
 #define DEFAULT_CORE_SOLVER STP_SOLVER
 #elif ENABLE_Z3
 #define STP_IS_DEFAULT_STR ""
 #define METASMT_IS_DEFAULT_STR ""
 #define Z3_IS_DEFAULT_STR " (default)"
+#define GREEN_IS_DEFAULT_STR ""
 #define DEFAULT_CORE_SOLVER Z3_SOLVER
 #elif ENABLE_METASMT
 #define STP_IS_DEFAULT_STR ""
 #define METASMT_IS_DEFAULT_STR " (default)"
 #define Z3_IS_DEFAULT_STR ""
+#define GREEN_IS_DEFAULT_STR ""
 #define DEFAULT_CORE_SOLVER METASMT_SOLVER
 #define Z3_IS_DEFAULT_STR ""
+#define GREEN_IS_DEFAULT_STR ""
+#elif ENABLE_GREEN
+#define STP_IS_DEFAULT_STR ""
+#define METASMT_IS_DEFAULT_STR ""
+#define Z3_IS_DEFAULT_STR ""
+#define GREEN_IS_DEFAULT_STR " (default)"
+#define DEFAULT_CORE_SOLVER GREEN_SOLVER
 #else
 #error "Unsupported solver configuration"
 #endif
-
-cl::opt<CoreSolverType>
+cl::opt<CoreSolverType> 
 CoreSolverToUse("solver-backend", cl::desc("Specifiy the core solver backend to use"),
-                cl::values(clEnumValN(STP_SOLVER, "stp", "stp" STP_IS_DEFAULT_STR),
-                           clEnumValN(METASMT_SOLVER, "metasmt", "metaSMT" METASMT_IS_DEFAULT_STR),
-                           clEnumValN(DUMMY_SOLVER, "dummy", "Dummy solver"),
-                           clEnumValN(Z3_SOLVER, "z3", "Z3" Z3_IS_DEFAULT_STR)
-                           KLEE_LLVM_CL_VAL_END),
-                cl::init(DEFAULT_CORE_SOLVER));
+    		cl::values(clEnumValN(STP_SOLVER, "stp", "stp" STP_IS_DEFAULT_STR),
+                     clEnumValN(METASMT_SOLVER, "metasmt", "metaSMT" METASMT_IS_DEFAULT_STR),
+                     clEnumValN(DUMMY_SOLVER, "dummy", "Dummy solver"),
+                     clEnumValN(Z3_SOLVER, "z3", "Z3" Z3_IS_DEFAULT_STR),
+                     clEnumValN(GREEN_SOLVER, "green", "GREEN" GREEN_IS_DEFAULT_STR),
+                     KLEE_LLVM_CL_VAL_END),
+    		cl::init(DEFAULT_CORE_SOLVER));
 
-cl::opt<CoreSolverType>
+cl::opt<CoreSolverType> 
 DebugCrossCheckCoreSolverWith("debug-crosscheck-core-solver",
-                              cl::desc("Specifiy a solver to use for cross checking with the core solver"),
-                              cl::values(clEnumValN(STP_SOLVER, "stp", "stp"),
-                                         clEnumValN(METASMT_SOLVER, "metasmt", "metaSMT"),
-                                         clEnumValN(DUMMY_SOLVER, "dummy", "Dummy solver"),
-                                         clEnumValN(Z3_SOLVER, "z3", "Z3"),
-                                         clEnumValN(NO_SOLVER, "none",
-                                                    "Do not cross check (default)")
-                                         KLEE_LLVM_CL_VAL_END),
-                              cl::init(NO_SOLVER));
+    				cl::desc("Specifiy a solver to use for cross checking with the core solver"),
+    				cl::values(clEnumValN(STP_SOLVER, "stp", "stp"),
+                     			clEnumValN(METASMT_SOLVER, "metasmt", "metaSMT"),
+             			        clEnumValN(DUMMY_SOLVER, "dummy", "Dummy solver"),
+                     			clEnumValN(Z3_SOLVER, "z3", "Z3"),
+                     			clEnumValN(NO_SOLVER, "none",
+                                		"Do not cross check (default)"),
+                     			KLEE_LLVM_CL_VAL_END),
+    				cl::init(NO_SOLVER));
 }
 
 #undef STP_IS_DEFAULT_STR
 #undef METASMT_IS_DEFAULT_STR
 #undef Z3_IS_DEFAULT_STR
+#undef GREEN_IS_DEFAULT_STR
 #undef DEFAULT_CORE_SOLVER
