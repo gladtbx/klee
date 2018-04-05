@@ -22,6 +22,8 @@
 #include "klee/Internal/Support/PrintVersion.h"
 #include "klee/Internal/Support/ErrorHandling.h"
 #include "klee/util/InstErrPerc.h"
+#include "klee/util/ArrayCache.h"
+#include "klee/CommandLine.h"
 
 #if LLVM_VERSION_CODE > LLVM_VERSION(3, 2)
 #include "llvm/IR/Constants.h"
@@ -239,6 +241,12 @@ namespace {
 
   cl::opt<bool>
   CalcInstErrPer("calcInstErrPer",cl::desc("Calculate the chance of causing errors per inst"),cl::init(0));
+
+
+  cl::opt<bool>
+  CacheQuery("cacheQuery",
+		  cl::desc("Cache the queries made for each test case"),
+		  cl::init(0));
 }
 
 extern cl::opt<double> MaxTime;
@@ -263,6 +271,7 @@ private:
   int m_argc;
   char **m_argv;
 
+  std::set<ref<Expr> > cached_queries;
 public:
   KleeHandler(int argc, char **argv);
   ~KleeHandler();
@@ -295,6 +304,9 @@ public:
   static void getKTestFilesInDir(std::string directoryPath,
                                  std::vector<std::string> &results);
 
+  static void getCacheFilesInDir(std::string directoryPath,
+          std::vector<std::string> &results);
+
   static std::string getRunTimeLibraryPath(const char *argv0);
   void processTargetFunction();
   std::vector<std::string>& getTargetFunction();
@@ -307,6 +319,19 @@ public:
   void calcErrPerc(){
 	  instErrorPerc->calcHue(getOutputFilename("suspiciousInstList.txt"));
   }
+
+  void insertCachedQueries(ref<Expr> cond);
+
+  void CacheQueryFromFile(const char *path);
+
+  ref<Expr> readExpr(std::string exprString);
+
+  std::pair<ref<Expr>,std::size_t> readReadExpr(std::string exprString);
+
+  std::set<ref<Expr> > getCachedConstraints(){
+	  return cached_queries;
+  };
+
 };
 
 KleeHandler::KleeHandler(int argc, char **argv)
@@ -582,6 +607,14 @@ void KleeHandler::processTestCase(const ExecutionState &state,
       delete f;
     }
 
+    if (CacheQuery){
+    	std::string constraints;
+    	m_interpreter->cacheConstraints(state, constraints);
+        llvm::raw_ostream *f = openTestFile("cache", id);
+        *f << constraints;
+        delete f;
+    }
+
     if(WriteSMT2s) {
       std::string constraints;
         m_interpreter->getConstraintLog(state, constraints, Interpreter::SMTLIB2);
@@ -685,6 +718,28 @@ void KleeHandler::getKTestFilesInDir(std::string directoryPath,
   }
 }
 
+void KleeHandler::getCacheFilesInDir(std::string directoryPath,
+                                     std::vector<std::string> &results) {
+#if LLVM_VERSION_CODE < LLVM_VERSION(3, 5)
+  error_code ec;
+#else
+  std::error_code ec;
+#endif
+  for (llvm::sys::fs::directory_iterator i(directoryPath, ec), e; i != e && !ec;
+       i.increment(ec)) {
+    std::string f = (*i).path();
+    if (f.substr(f.size()-6,f.size()) == ".cache") {
+          results.push_back(f);
+    }
+  }
+
+  if (ec) {
+    llvm::errs() << "ERROR: unable to read output directory: " << directoryPath
+                 << ": " << ec.message() << "\n";
+    exit(1);
+  }
+}
+
 std::string KleeHandler::getRunTimeLibraryPath(const char *argv0) {
   // allow specifying the path to the runtime library
   const char *env = getenv("KLEE_RUNTIME_LIBRARY_PATH");
@@ -746,6 +801,190 @@ void KleeHandler::processTargetFunction(){
 
 std::vector<std::string>& KleeHandler::getTargetFunction(){
 	return m_targetFunctions;
+}
+
+void KleeHandler::insertCachedQueries(ref<Expr> cond){
+	cached_queries.insert(cond);
+}
+
+std::pair<ref<Expr>,std::size_t> KleeHandler::readReadExpr(std::string exprString){
+
+}
+
+ref<Expr> KleeHandler::readExpr(std::string exprString){
+	//Each line is an expr, with its expression seperated by ','
+	std::vector<ref<Expr> > stack;// A stack to hold partial exprs
+	std::size_t found = exprString.find_first_of(',');
+	std::size_t pfound = -1;
+	while(found != std::string::npos){
+		std::string exprSS = exprString.substr(pfound+1,found-pfound-1);
+		//std::cout<< exprSS << std::endl;
+		std::size_t colon = exprSS.find_first_of(':');
+		std::string fh,sh;//First half, second half
+		if(colon == std::string::npos){
+			fh = exprSS;
+		}else{
+			fh = exprSS.substr(0,colon);
+			sh = exprSS.substr(colon+1, exprSS.size() - colon - 1);
+		}
+		ref<Expr> result;
+		if(fh.compare("Constant") == 0){
+			//std::cout<<"Constant " << sh << std::endl;
+			std::string value = sh.substr(0,sh.find_first_of(' '));
+			std::string width = sh.substr(sh.find_first_of(' ') + 1);
+			int v = std::atoi(value.c_str());
+			unsigned int w = std::atoi(width.c_str());
+			APInt api = APInt(w,v,true);
+			result = klee::ConstantExpr::alloc(api);
+		}
+		else if(fh.compare("Read") == 0){
+			if(stack.size()<1){
+				klee_warning("Query was not loaded correctly");
+				return ref<Expr>();
+			}
+
+			//std::cout<<"Read " << sh << std::endl;
+			//Gladtbx: Need to change.
+			ArrayCache *arrayCache = new ArrayCache();
+			const Array* array = arrayCache->CreateArray(sh,1);
+			UpdateList ul(array, NULL);
+			ref<Expr> l = stack.back();
+			stack.pop_back();
+			result = klee::ReadExpr::create(ul, l);
+			/*std::pair<ref<Expr>,std::size_t> resultPair = readReadExpr(exprString.substr(pfound+1+colon));
+			result = resultPair.first;
+			found = resultPair.second + pfound + 1 + colon;*/
+		}
+		else if(fh.compare("Concat") == 0){
+			ref<Expr> l,r;
+			if(stack.size()<2){
+				klee_warning("Query was not loaded correctly");
+				return ref<Expr>();
+			}
+			l = stack.back();
+			stack.pop_back();
+			r = stack.back();
+			stack.pop_back();
+			result = klee::ConcatExpr::create(l,r);
+		}else if(fh.compare("Slt") == 0){
+			ref<Expr> l,r;
+			if(stack.size()<2){
+				klee_warning("Query was not loaded correctly");
+				return ref<Expr>();
+			}
+			l = stack.back();
+			stack.pop_back();
+			r = stack.back();
+			stack.pop_back();
+			result = klee::SltExpr::create(l,r);
+		}else if(fh.compare("Sle") == 0){
+			ref<Expr> l,r;
+			if(stack.size()<2){
+				klee_warning("Query was not loaded correctly");
+				return ref<Expr>();
+			}
+			l = stack.back();
+			stack.pop_back();
+			r = stack.back();
+			stack.pop_back();
+			result = klee::SleExpr::create(l,r);
+		}else if(fh.compare("Sge") == 0){
+			ref<Expr> l,r;
+			if(stack.size()<2){
+				klee_warning("Query was not loaded correctly");
+				return ref<Expr>();
+			}
+			l = stack.back();
+			stack.pop_back();
+			r = stack.back();
+			stack.pop_back();
+			result = klee::SgeExpr::create(l,r);
+		}else if(fh.compare("Sgt") == 0){
+			ref<Expr> l,r;
+			if(stack.size()<2){
+				klee_warning("Query was not loaded correctly");
+				return ref<Expr>();
+			}
+			l = stack.back();
+			stack.pop_back();
+			r = stack.back();
+			stack.pop_back();
+			result = klee::SgtExpr::create(l,r);
+		}else if(fh.compare("Add") == 0){
+			ref<Expr> l,r;
+			if(stack.size()<2){
+				klee_warning("Query was not loaded correctly");
+				return ref<Expr>();
+			}
+			l = stack.back();
+			stack.pop_back();
+			r = stack.back();
+			stack.pop_back();
+			result = klee::AddExpr::create(l,r);
+		}else if(fh.compare("SExt") == 0){
+			ref<Expr> l;
+			if(stack.size()<1){
+				klee_warning("Query was not loaded correctly");
+				return ref<Expr>();
+			}
+			l = stack.back();
+			stack.pop_back();
+			unsigned int v = std::atoi(sh.c_str());
+			result = klee::SExtExpr::create(l,v);
+		}
+		else if(fh.compare("ZExt") == 0){
+			ref<Expr> l;
+			if(stack.size()<1){
+				klee_warning("Query was not loaded correctly");
+				return ref<Expr>();
+			}
+			l = stack.back();
+			stack.pop_back();
+			unsigned int v = std::atoi(sh.c_str());
+			result = klee::ZExtExpr::create(l,v);
+		}else if(fh.compare("Eq") == 0){
+			ref<Expr> l,r;
+			if(stack.size()<2){
+				klee_warning("Query was not loaded correctly");
+				return ref<Expr>();
+			}
+			l = stack.back();
+			stack.pop_back();
+			r = stack.back();
+			stack.pop_back();
+			result = klee::EqExpr::create(l,r);
+		}else{
+			printf("%s not supported by LoadCache yet\n",fh.c_str());
+			klee_warning("Expr not supported by LoadCache");
+			return ref<Expr>();
+		}
+		stack.push_back(result);
+		pfound = found;
+		found=exprString.find_first_of(',',found+1);
+	}
+	if(stack.size() == 1){
+		return stack.back();
+	}
+	else{
+		klee_warning("Query was not loaded correctly");
+	}
+	return ref<Expr>();
+}
+
+void KleeHandler::CacheQueryFromFile(const char *path){
+	//printf("Getting from file: %s",path);
+	std::ifstream f(path);
+	if (!f.is_open()){
+		klee_warning("Cannot open cache file");
+		return;
+	}
+	std::string exprStr;
+	while( getline(f, exprStr)){
+		ref<Expr> expr = readExpr(exprStr);
+		if(expr.get() != NULL){
+			this->insertCachedQueries(expr);
+		}
+	}
 }
 
 
@@ -1511,6 +1750,19 @@ int main(int argc, char **argv, char **envp) {
   KleeHandler *handler = new KleeHandler(pArgc, pArgv);
 
   handler->processTargetFunction();
+  if(!LoadCacheFile.empty()){
+	  std::vector<std::string> CacheFiles = LoadCacheFile;
+	for (std::vector<std::string>::iterator
+			it = ReplayKTestDir.begin(), ie = ReplayKTestDir.end();
+			it != ie; ++it)
+		KleeHandler::getCacheFilesInDir(*it, CacheFiles);
+	std::vector<std::set<ref<Expr> > > cacheQuery;
+	for (std::vector<std::string>::iterator
+			it = CacheFiles.begin(), ie = CacheFiles.end();
+			it != ie; ++it) {
+		 handler->CacheQueryFromFile(it->c_str());
+	}
+  }
 
   Interpreter *interpreter =
     theInterpreter = Interpreter::create(IOpts, handler);
@@ -1635,9 +1887,12 @@ int main(int argc, char **argv, char **envp) {
       seeds.pop_back();
     }
   }
+
+  //Gladtbx added
   if(CalcInstErrPer){
 	  handler->calcErrPerc();
   }
+
   t[1] = time(NULL);
   strftime(buf, sizeof(buf), "Finished: %Y-%m-%d %H:%M:%S\n", localtime(&t[1]));
   handler->getInfoStream() << buf;

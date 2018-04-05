@@ -324,6 +324,7 @@ namespace {
   ActivePruning("active-pruning",
 		  cl::desc("Actively use solver to prune states"),
 		  cl::init(false));
+
 }
 
 
@@ -369,7 +370,8 @@ Executor::Executor(const InterpreterOptions &opts, InterpreterHandler *ih)
       interpreterHandler->getOutputFilename(ALL_QUERIES_SMT2_FILE_NAME),
       interpreterHandler->getOutputFilename(SOLVER_QUERIES_SMT2_FILE_NAME),
       interpreterHandler->getOutputFilename(ALL_QUERIES_KQUERY_FILE_NAME),
-      interpreterHandler->getOutputFilename(SOLVER_QUERIES_KQUERY_FILE_NAME));
+      interpreterHandler->getOutputFilename(SOLVER_QUERIES_KQUERY_FILE_NAME),
+      interpreterHandler->getCachedConstraints());
 
   this->solver = new TimingSolver(solver, EqualitySubstitution);
   memory = new MemoryManager(&arrayCache);
@@ -3119,6 +3121,11 @@ void Executor::terminateState(ExecutionState &state) {
     processTree->remove(state.ptreeNode);
     delete &state;
   }
+/*Gladtbx to be deleted
+  if(CacheQuery){
+	  //We need to dump the queries as cached queries so we can use them in the future
+	  state.constraints.dumpConstraints();
+  }*/
 }
 
 void Executor::terminateStateEarly(ExecutionState &state, 
@@ -3927,6 +3934,13 @@ void Executor::getConstraintLog(const ExecutionState &state, std::string &res,
   default:
     klee_warning("Executor::getConstraintLog() : Log format not supported!");
   }
+}
+
+void Executor::cacheConstraints(const ExecutionState &state, std::string &res){
+    std::string Str;
+    llvm::raw_string_ostream info(Str);
+    ExprPPrinter::printConstraintsAsCache(info, state.constraints);
+    res = info.str();
 }
 
 bool Executor::getSymbolicSolution(const ExecutionState &state,

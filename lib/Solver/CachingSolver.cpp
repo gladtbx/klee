@@ -16,6 +16,7 @@
 #include "klee/SolverImpl.h"
 
 #include "klee/SolverStats.h"
+#include "llvm/Support/Casting.h"
 
 #include <ciso646>
 #ifdef _LIBCPP_VERSION
@@ -39,6 +40,8 @@ private:
   bool cacheLookup(const Query& query,
                    IncompleteSolver::PartialValidity &result);
   
+  bool checkCacheHit(ref<Expr> q);
+
   struct CacheEntry {
     CacheEntry(const ConstraintManager &c, ref<Expr> q)
       : constraints(c), query(q) {}
@@ -73,8 +76,10 @@ private:
   Solver *solver;
   cache_map cache;
 
+  std::set<ref<Expr> > cachedConstraints;
+
 public:
-  CachingSolver(Solver *s) : solver(s) {}
+  CachingSolver(Solver *s, std::set<ref<Expr> > _cachedConstraints) : solver(s), cachedConstraints(_cachedConstraints) {}
   ~CachingSolver() { cache.clear(); delete solver; }
 
   bool computeValidity(const Query&, Solver::Validity &result);
@@ -113,6 +118,47 @@ ref<Expr> CachingSolver::canonicalizeQuery(ref<Expr> originalQuery,
   }
 }
 
+bool compareExpr(ref<Expr> l, ref<Expr> r){
+	Expr::Kind lk = l->getKind();
+	Expr::Kind rk = r->getKind();
+	if(lk != rk){
+		return false;
+	}
+	if(lk == Expr::Constant){
+		const ConstantExpr *rl = llvm::dyn_cast<ConstantExpr>(l);
+		const ConstantExpr *rr = llvm::dyn_cast<ConstantExpr>(r);
+		return (llvm::APInt::isSameValue(rl->getAPValue(),rr->getAPValue()));
+	}
+	if(lk == Expr::Read){
+		const ReadExpr *rl = llvm::dyn_cast<ReadExpr>(l);
+		const ReadExpr *rr = llvm::dyn_cast<ReadExpr>(r);
+		if(rl->updates.root->name == rr->updates.root->name){
+			return compareExpr(rl->index, rr->index);
+		}
+	}
+	int numKids = l->getNumKids();
+	for(int i = 0; i < numKids; i++){
+		if(!compareExpr(l->getKid(i), r->getKid(i))){
+			return false;
+		}
+	}
+	return true;
+}
+
+bool CachingSolver::checkCacheHit(ref<Expr> q){
+	printf("Checking if cache hit for: \n");
+	q->dump();
+	for(std::set<ref<Expr> >::iterator it = cachedConstraints.begin(), itEnd =cachedConstraints.end();
+		it != itEnd; it++){
+		printf("Constraints now:\n");
+		(*it)->dump();
+		if(compareExpr(*it,q)){
+			return true;
+		}
+	}
+	return false;
+}
+
 /** @returns true on a cache hit, false of a cache miss.  Reference
     value result only valid on a cache hit. */
 bool CachingSolver::cacheLookup(const Query& query,
@@ -120,7 +166,18 @@ bool CachingSolver::cacheLookup(const Query& query,
   bool negationUsed;
   ref<Expr> canonicalQuery = canonicalizeQuery(query.expr, negationUsed);
 
+  //Check if Gladtbx implemented cache is a hit
+//  if(checkCacheHit(canonicalQuery)){
+//	  ++stats::cachedConstraintsHit;
+//	  return true;
+//  }
+
   CacheEntry ce(query.constraints, canonicalQuery);
+  //Gladtbx: Cached query are checked with strict equality
+  //Is it really necessary?
+  //If we can do check each ref<Expr> of the constraints with the one in cache
+  //We should be able to improve hit rate?
+  //We have to make sure the cache entries are True.
   cache_map::iterator it = cache.find(ce);
   
   if (it != cache.end()) {
@@ -263,6 +320,6 @@ void CachingSolver::setCoreSolverTimeout(double timeout) {
 
 ///
 
-Solver *klee::createCachingSolver(Solver *_solver) {
-  return new Solver(new CachingSolver(_solver));
+Solver *klee::createCachingSolver(Solver *_solver, std::set<ref<Expr> > cachedConstraints) {
+  return new Solver(new CachingSolver(_solver, cachedConstraints));
 }

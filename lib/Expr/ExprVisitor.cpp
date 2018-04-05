@@ -21,6 +21,12 @@ namespace {
 
 using namespace klee;
 
+/*
+ * Gladtbx:
+ * visited is a map of ref<Expr> to ref<Expr>.
+ * The second if built based on the first using visitActual
+ * function. I don't know why the rebuild is needed here.
+ */
 ref<Expr> ExprVisitor::visit(const ref<Expr> &e) {
   if (!UseVisitorHash || isa<ConstantExpr>(e)) {
     return visitActual(e);
@@ -37,6 +43,14 @@ ref<Expr> ExprVisitor::visit(const ref<Expr> &e) {
   }
 }
 
+/*
+ * Gladtbx:
+ * Visit the expression, and depending on the type of expression,
+ * if it is not constant, recursively visit the arguments
+ * I am not sure why we need to call this function, seems to me
+ * it is just building the whole expr one more time. Maybe it is
+ * because some parts get updated?
+ */
 ref<Expr> ExprVisitor::visitActual(const ref<Expr> &e) {
   if (isa<ConstantExpr>(e)) {    
     return e;

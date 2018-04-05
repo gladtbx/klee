@@ -13,6 +13,8 @@
 #include <string>
 #include <map>
 #include <set>
+#include "klee/util/Ref.h"
+#include "klee/Expr.h"
 
 struct KTest;
 
@@ -48,6 +50,8 @@ public:
   virtual void processPathInfo(const ExecutionState & state, const char* err, const char *suffix) = 0;
 
   virtual bool ifConstructSeedForTarget() const = 0;
+
+  virtual std::set<ref<Expr> > getCachedConstraints() = 0;
 };
 
 class Interpreter {
@@ -150,6 +154,8 @@ public:
   virtual void getConstraintLog(const ExecutionState &state,
                                 std::string &res,
                                 LogType logFormat = STP) = 0;
+
+  virtual void cacheConstraints(const ExecutionState &state, std::string &res) = 0;
 
   virtual bool getSymbolicSolution(const ExecutionState &state, 
                                    std::vector< 

@@ -413,6 +413,42 @@ public:
     }
   }
 
+  /*
+   * If e is constant, we print directly
+   * Otherwise we call recursively on ourself
+   */
+  void printExpr(llvm::raw_ostream &PC, const ref<Expr> &e){
+  	if(const ConstantExpr *re = dyn_cast<ConstantExpr>(e)){
+  		PC << re->getKind() <<":";
+  		PC << re->getAPValue();
+  		PC << " ";
+  		PC << re->getWidth();
+  		PC << ",";
+  		return;
+  	}
+  	for(unsigned int i = 0; i < e->getNumKids(); i++){
+  		printExpr(PC, e->getKid(i));
+  	}
+
+  	PC << e->getKind();
+
+  	if(const ReadExpr *re = dyn_cast<ReadExpr>(e)){
+  		PC << ":" << re->updates.root->name;
+  	}
+  	if(const SExtExpr *re = dyn_cast<SExtExpr>(e)){
+  		PC << ":" << re->width;
+  	}
+  	if(const ZExtExpr *re = dyn_cast<ZExtExpr>(e)){
+  		PC << ":" << re->width;
+  	}
+  	if(const ExtractExpr *re = dyn_cast<ExtractExpr>(e)){
+  		PC << ":" << re->offset;
+  	}
+
+  	PC << ",";
+  	return;
+  }
+
   /* Public utility functions */
 
   void printSeparator(PrintContext &PC, bool simple, unsigned indent) {
@@ -464,6 +500,18 @@ struct ArrayPtrsByName {
     return a1->name < a2->name;
   }
 };
+}
+
+
+
+void ExprPPrinter::printConstraintsAsCache(llvm::raw_ostream &os, const ConstraintManager &constraints){
+	PPrinter p(os);
+	//PrintContext PC(os);
+	for(ConstraintManager::const_iterator it = constraints.begin(),
+	         ie = constraints.end(); it != ie; ++it){
+		p.printExpr(os, *it);
+		os<<"\n";
+	}
 }
 
 void ExprPPrinter::printQuery(llvm::raw_ostream &os,

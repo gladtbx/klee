@@ -257,6 +257,23 @@ namespace klee {
 
 #endif /* ENABLE_METASMT */
 
+#ifdef ENABLE_GREEN
+class GreenSolver : public Solver {
+  public:
+    /// Z3Solver - Construct a new Z3Solver.
+    GreenSolver();
+
+    /// Get the query in SMT-LIBv2 format.
+    /// \return A C-style string. The caller is responsible for freeing this.
+    virtual char *getConstraintLog(const Query &);
+
+    /// setCoreSolverTimeout - Set constraint solver timeout delay to the given
+    /// value; 0
+    /// is off.
+    virtual void setCoreSolverTimeout(double timeout);
+};
+#endif
+
   /* *** */
 
   /// createValidatingSolver - Create a solver which will validate all query
@@ -272,7 +289,7 @@ namespace klee {
   /// memory (without eviction).
   ///
   /// \param s - The underlying solver to use.
-  Solver *createCachingSolver(Solver *s);
+  Solver *createCachingSolver(Solver *s, std::set<ref<Expr> > cachedConstraints = std::set<ref<Expr> >());
 
   /// createCexCachingSolver - Create a counterexample caching solver. This is a
   /// more sophisticated cache which records counterexamples for a constraint

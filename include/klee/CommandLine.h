@@ -31,6 +31,10 @@ extern llvm::cl::opt<bool> CoreSolverOptimizeDivides;
 
 extern llvm::cl::opt<std::string> TargetFuntion;
 
+extern llvm::cl::list<std::string> LoadCacheFile;
+
+extern llvm::cl::list<std::string> LoadCacheDir;
+
 ///The different query logging solvers that can switched on/off
 enum QueryLoggingSolverType
 {
@@ -51,6 +55,7 @@ enum CoreSolverType {
   METASMT_SOLVER,
   DUMMY_SOLVER,
   Z3_SOLVER,
+  GREEN_SOLVER,
   NO_SOLVER
 };
 extern llvm::cl::opt<CoreSolverType> CoreSolverToUse;

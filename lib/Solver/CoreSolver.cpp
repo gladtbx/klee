@@ -89,6 +89,14 @@ Solver *createCoreSolver(CoreSolverType cst) {
     llvm::errs() << "Not compiled with Z3 support\n";
     return NULL;
 #endif
+  case GREEN_SOLVER:
+#ifdef ENABLE_GREEN
+	llvm::errs()<< "Using Green solver backend\n";
+	return new GreenSolver();
+#else
+	llvm::errs() << "Not compiled with Green support\n";
+	return NULL;
+#endif
   case NO_SOLVER:
     llvm::errs() << "Invalid solver\n";
     return NULL;

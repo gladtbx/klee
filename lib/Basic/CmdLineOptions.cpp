@@ -64,7 +64,13 @@ CoreSolverOptimizeDivides("solver-optimize-divides",
                  llvm::cl::desc("Optimize constant divides into add/shift/multiplies before passing to core SMT solver (default=off)"),
                  llvm::cl::init(false));
 
+llvm::cl::list<std::string> LoadCacheFile("loadCacheFile",
+                llvm::cl::desc("Specify a cache file to load"),
+                llvm::cl::value_desc("cache file"));
 
+llvm::cl::list<std::string> LoadCacheDir("loadCacheDir",
+                llvm::cl::desc("Specify a cache dir to load"),
+                llvm::cl::value_desc("cache dir"));
 /* Using cl::list<> instead of cl::bits<> results in quite a bit of ugliness when it comes to checking
  * if an option is set. Unfortunately with gcc4.7 cl::bits<> is broken with LLVM2.9 and I doubt everyone
  * wants to patch their copy of LLVM just for these options.
@@ -116,18 +122,28 @@ llvm::cl::opt<klee::MetaSMTBackendType> MetaSMTBackend(
 #define STP_IS_DEFAULT_STR " (default)"
 #define METASMT_IS_DEFAULT_STR ""
 #define Z3_IS_DEFAULT_STR ""
+#define GREEN_IS_DEFAULT_STR ""
 #define DEFAULT_CORE_SOLVER STP_SOLVER
 #elif ENABLE_Z3
 #define STP_IS_DEFAULT_STR ""
 #define METASMT_IS_DEFAULT_STR ""
 #define Z3_IS_DEFAULT_STR " (default)"
+#define GREEN_IS_DEFAULT_STR ""
 #define DEFAULT_CORE_SOLVER Z3_SOLVER
 #elif ENABLE_METASMT
 #define STP_IS_DEFAULT_STR ""
 #define METASMT_IS_DEFAULT_STR " (default)"
 #define Z3_IS_DEFAULT_STR ""
+#define GREEN_IS_DEFAULT_STR ""
 #define DEFAULT_CORE_SOLVER METASMT_SOLVER
 #define Z3_IS_DEFAULT_STR ""
+#define GREEN_IS_DEFAULT_STR ""
+#elif ENABLE_GREEN
+#define STP_IS_DEFAULT_STR ""
+#define METASMT_IS_DEFAULT_STR ""
+#define Z3_IS_DEFAULT_STR ""
+#define GREEN_IS_DEFAULT_STR " (default)"
+#define DEFAULT_CORE_SOLVER GREEN_SOLVER
 #else
 #error "Unsupported solver configuration"
 #endif
@@ -137,6 +153,7 @@ llvm::cl::opt<CoreSolverType> CoreSolverToUse(
                      clEnumValN(METASMT_SOLVER, "metasmt", "metaSMT" METASMT_IS_DEFAULT_STR),
                      clEnumValN(DUMMY_SOLVER, "dummy", "Dummy solver"),
                      clEnumValN(Z3_SOLVER, "z3", "Z3" Z3_IS_DEFAULT_STR),
+                     clEnumValN(GREEN_SOLVER, "green", "GREEN" GREEN_IS_DEFAULT_STR),
                      clEnumValEnd),
     llvm::cl::init(DEFAULT_CORE_SOLVER));
 
@@ -156,6 +173,7 @@ llvm::cl::opt<CoreSolverType> DebugCrossCheckCoreSolverWith(
 #undef STP_IS_DEFAULT_STR
 #undef METASMT_IS_DEFAULT_STR
 #undef Z3_IS_DEFAULT_STR
+#undef GREEN_IS_DEFAULT_STR
 #undef DEFAULT_CORE_SOLVER
 
 
