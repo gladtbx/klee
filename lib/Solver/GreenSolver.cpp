@@ -207,8 +207,9 @@ bool GreenSolverImpl::internalRunSolver(
 	printer.setOutput(queryBuffer);
 	printer.setQuery(query);
     printer.generateOutput();
-	printf("$s\n",BufferString.c_str());
+	//printf("%s\n",BufferString.c_str());
 	int retVal = green_issat(queryBuffer.str().c_str(),recv);
+	printf("Received Reponse: %s\n",recv);
 	if(retVal != 0){
 		runStatusCode = SOLVER_RUN_STATUS_FAILURE;
 		hasSolution = false;
