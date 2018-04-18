@@ -208,8 +208,21 @@ bool GreenSolverImpl::internalRunSolver(
 	printer.setQuery(query);
     printer.generateOutput();
 	//printf("%s\n",BufferString.c_str());
-	int retVal = green_issat(queryBuffer.str().c_str(),recv);
-	printf("Received Reponse: %s\n",recv);
+    //We need to attach the variable information vss in front of the query
+    std::string vss = "ASV";
+    for(int i = 0; i < objects->size(); i++){
+    	vss += " ";
+    	vss += (*objects)[i]->getName();
+    	vss += " ";
+    	std::ostringstream temp;
+    	temp << ((*objects)[i]->size);
+    	vss += temp.str();
+    }
+    vss += "\n";
+    vss += queryBuffer.str();
+    int retVal = green_issat(vss.c_str(),recv);
+    //int retVal = green_issat(queryBuffer.str().c_str(),recv);
+	//printf("Received Reponse: %s\n",recv);
 	if(retVal != 0){
 		runStatusCode = SOLVER_RUN_STATUS_FAILURE;
 		hasSolution = false;
