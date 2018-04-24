@@ -458,8 +458,6 @@ private:
   void initTimers();
   void processTimers(ExecutionState *current,
                      double maxInstTime);
-  void checkMemoryUsage();
-  void printDebugInstructions(ExecutionState &state);
   void doDumpStates();
 
 
@@ -485,7 +483,6 @@ private:
 
   void checkMemoryUsage();
   void printDebugInstructions(ExecutionState &state);
-  void doDumpStates();
 
   std::string getPathInfo(const ExecutionState &state, bool trueBranch);
 

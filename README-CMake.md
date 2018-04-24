@@ -55,6 +55,8 @@ cmake -DCMAKE_BUILD_TYPE=Release /path/to/klee/src
 
 * `ENABLE_SOLVER_Z3` (BOOLEAN) - Enable Z3 solver support.
 
+* `ENABLE_SOLVER_GREEN` (BOOLEAN) - Enable GREEN solver support.
+
 * `ENABLE_TCMALLOC` (BOOLEAN) - Enable TCMalloc support.
 
 * `ENABLE_UNIT_TESTS` (BOOLEAN) - Enable KLEE unit tests.

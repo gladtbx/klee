@@ -13,6 +13,9 @@
 /* Using Z3 Solver backend */
 #cmakedefine ENABLE_Z3 @ENABLE_Z3@
 
+/* Using Green Solver backend */
+#cmakedefine ENABLE_GREEN @ENABLE_GREEN@
+
 /* Does the platform use __ctype_b_loc, etc. */
 #cmakedefine HAVE_CTYPE_EXTERNALS @HAVE_CTYPE_EXTERNALS@
 

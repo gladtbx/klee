@@ -324,7 +324,6 @@ public:
 };
 
 KleeHandler::KleeHandler(int argc, char **argv)
-<<<<<<< 415f83be9699b1e237b788bd045ce5153409a761
     : m_interpreter(0), m_pathWriter(0), m_symPathWriter(0), m_infoFile(0), instErrorPerc(0), m_outputDirectory(), m_targetFunctions(), m_numTotalTests(0), m_numGeneratedTests(0),
       m_pathsExplored(0), m_argc(argc), m_argv(argv) {
 
@@ -778,9 +777,9 @@ void KleeHandler::insertCachedQueries(ref<Expr> cond){
 	cached_queries.insert(cond);
 }
 
-std::pair<ref<Expr>,std::size_t> KleeHandler::readReadExpr(std::string exprString){
+/*std::pair<ref<Expr>,std::size_t> KleeHandler::readReadExpr(std::string exprString){
 
-}
+}*/
 
 ref<Expr> KleeHandler::readExpr(std::string exprString){
 	//Each line is an expr, with its expression seperated by ','
@@ -1333,7 +1332,7 @@ static char *format_tdiff(char *buf, long seconds)
   return buf;
 }
 
-#ifdef SUPPORT_KLEE_UCLIBC
+#ifndef SUPPORT_KLEE_UCLIBC
 static llvm::Module *linkWithUclibc(llvm::Module *mainModule, StringRef libDir) {
   klee_error("invalid libc, no uclibc support!\n");
 }

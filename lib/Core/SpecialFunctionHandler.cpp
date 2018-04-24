@@ -941,7 +941,7 @@ void SpecialFunctionHandler::handleOpen(ExecutionState &state,
 
 		klee_warning("Fopen returned id: %d, size: %d\n",id,buffer.second);
 
-		LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+		 llvm::Type *resultType = target->inst->getType();
 		if (!resultType->isVoidTy()) {
 			uint64_t v = id;
 			unsigned width = resultType->getPrimitiveSizeInBits();
@@ -1116,7 +1116,7 @@ void SpecialFunctionHandler::processScan(ExecutionState *current_state,Expr::Wid
 			//ref<Expr> result = branches.second->ioBuffer.processNumber(w, ary);
 			if(result.empty()){//if there is no digit read.
 				//set the return value to be arguments read. Do not process any more.
-				LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+				 llvm::Type *resultType = target->inst->getType();
 				if (!resultType->isVoidTy()) {
 					unsigned width = resultType->getPrimitiveSizeInBits();
 					ref<Expr> e;
@@ -1142,7 +1142,7 @@ void SpecialFunctionHandler::processScan(ExecutionState *current_state,Expr::Wid
 			ExecutionState::fileDesc* local_desc = branches.first->getBuffer(fileid);
 			if(local_desc->getoffset() >= local_desc->getsize()){
 				//return EOF
-				LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+				 llvm::Type *resultType = target->inst->getType();
 				if (!resultType->isVoidTy()) {
 					unsigned width = resultType->getPrimitiveSizeInBits();
 					ref<Expr> e;
@@ -1195,7 +1195,7 @@ void SpecialFunctionHandler::processScanHex(ExecutionState *current_state,Expr::
 			executor.executeMemoryOperation(*(zeroBranch.first),true,targetBuf,result,0);//bind result with target
 			zeroBranch.first->incBytesRead();
 			//return EOF as there is no more to read
-			LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+			 llvm::Type *resultType = target->inst->getType();
 			if (!resultType->isVoidTy()) {
 				unsigned width = resultType->getPrimitiveSizeInBits();
 				ref<Expr> e;
@@ -1218,7 +1218,7 @@ void SpecialFunctionHandler::processScanHex(ExecutionState *current_state,Expr::
 				if(local_desc->getoffset() >= local_desc->getsize()){
 					//if no more buffer to read
 					//return EOF
-					LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+					 llvm::Type *resultType = target->inst->getType();
 					if (!resultType->isVoidTy()) {
 						unsigned width = resultType->getPrimitiveSizeInBits();
 						ref<Expr> e;
@@ -1330,7 +1330,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 					descriptor = (*s)->getBuffer(fileid);
 					if(descriptor->getoffset()>=size){
 								//return EOF
-						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						 llvm::Type *resultType = target->inst->getType();
 						if (!resultType->isVoidTy()) {
 							unsigned width = resultType->getPrimitiveSizeInBits();
 							ref<Expr> e;
@@ -1370,7 +1370,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 							if(result){//a white character found, move to next char
 								if(descriptor->getoffset()>=size){
 									//return EOF
-									LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+									 llvm::Type *resultType = target->inst->getType();
 									if (!resultType->isVoidTy()) {
 										unsigned width = resultType->getPrimitiveSizeInBits();
 										ref<Expr> e;
@@ -1392,7 +1392,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 							//Not enough parameters to be read to.
 							klee_warning("Not enough parameter to be put char in");
 							//set return to bytesread
-							LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+							 llvm::Type *resultType = target->inst->getType();
 							if (!resultType->isVoidTy()) {
 								unsigned width = resultType->getPrimitiveSizeInBits();
 								ref<Expr> e;
@@ -1462,7 +1462,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 								ExecutionState::fileDesc* local_desc = signbranches.first->getBuffer(fileid);
 								if(local_desc->getoffset() >= size){
 									//return EOF
-									LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+									 llvm::Type *resultType = target->inst->getType();
 									if (!resultType->isVoidTy()) {
 										unsigned width = resultType->getPrimitiveSizeInBits();
 										ref<Expr> e;
@@ -1506,7 +1506,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 								ExecutionState::fileDesc* local_desc = signbranches.first->getBuffer(fileid);
 								if(local_desc->getoffset() >= size){
 									//return EOF
-									LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+									 llvm::Type *resultType = target->inst->getType();
 									if (!resultType->isVoidTy()) {
 										unsigned width = resultType->getPrimitiveSizeInBits();
 										ref<Expr> e;
@@ -1534,7 +1534,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 						}
 						//else{
 							//if not a correct specifier, return numbytes read;
-							LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+							 llvm::Type *resultType = target->inst->getType();
 							if (!resultType->isVoidTy()) {
 								unsigned width = resultType->getPrimitiveSizeInBits();
 								ref<Expr> e;
@@ -1572,7 +1572,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 								if(result){//a white character found, move to next char
 									if(descriptor->getoffset()>=size){
 										//return EOF
-										LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+										 llvm::Type *resultType = target->inst->getType();
 										if (!resultType->isVoidTy()) {
 											unsigned width = resultType->getPrimitiveSizeInBits();
 											ref<Expr> e;
@@ -1605,7 +1605,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 						else{
 							klee_warning("Fscanf found string not able to match!!");
 							//return num of chars read.
-							LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+							 llvm::Type *resultType = target->inst->getType();
 							if (!resultType->isVoidTy()) {
 								unsigned width = resultType->getPrimitiveSizeInBits();
 								ref<Expr> e;
@@ -1636,7 +1636,7 @@ void SpecialFunctionHandler::handleFscanf(ExecutionState &state,
 			}
 			//after processed every literal in the format string, return bytes read for each state inside not processed_state.
 			for(std::vector<ExecutionState*>::iterator s= stateNotProcessed.begin(); s != stateNotProcessed.end();s++){
-				LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+				 llvm::Type *resultType = target->inst->getType();
 				if (!resultType->isVoidTy()) {
 					unsigned width = resultType->getPrimitiveSizeInBits();
 					ref<Expr> e;
@@ -1753,7 +1753,7 @@ void SpecialFunctionHandler::handleFprintf(ExecutionState &state,
 			}
 		}
 	}
-	LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+	 llvm::Type *resultType = target->inst->getType();
 	if (!resultType->isVoidTy()) {
 		unsigned width = resultType->getPrimitiveSizeInBits();
 		ref<Expr> e;
@@ -1790,7 +1790,7 @@ void SpecialFunctionHandler::handleFputc(ExecutionState &state,
 	if(descriptor->getoffset()>=descriptor->getsize()){
 		klee_error("Output buffer over flow!!");
 	}
-	LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+	 llvm::Type *resultType = target->inst->getType();
 	if (!resultType->isVoidTy()) {
 		executor.bindLocal(target, state, arguments[0]);
 	 }
@@ -1828,7 +1828,7 @@ void SpecialFunctionHandler::handleFread(ExecutionState &state,
 				switch (size){
 				case 1:
 					if(descriptor->getoffset() >= desc_size){//eof reached, number of bytes read returned;
-						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						 llvm::Type *resultType = target->inst->getType();
 						if (!resultType->isVoidTy()) {
 							unsigned width = resultType->getPrimitiveSizeInBits();
 							ref<Expr> e;
@@ -1845,7 +1845,7 @@ void SpecialFunctionHandler::handleFread(ExecutionState &state,
 					break;
 				case 2:
 					if(descriptor->getoffset()+1>=desc_size){
-						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						 llvm::Type *resultType = target->inst->getType();
 						if (!resultType->isVoidTy()) {
 							unsigned width = resultType->getPrimitiveSizeInBits();
 							ref<Expr> e;
@@ -1863,7 +1863,7 @@ void SpecialFunctionHandler::handleFread(ExecutionState &state,
 					break;
 				case 4:
 					if(descriptor->getoffset()+1>=desc_size){
-						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						 llvm::Type *resultType = target->inst->getType();
 						if (!resultType->isVoidTy()) {
 							unsigned width = resultType->getPrimitiveSizeInBits();
 							ref<Expr> e;
@@ -1883,7 +1883,7 @@ void SpecialFunctionHandler::handleFread(ExecutionState &state,
 					break;
 				case 8:
 					if(descriptor->getoffset()+7>=desc_size){
-						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						 llvm::Type *resultType = target->inst->getType();
 						if (!resultType->isVoidTy()) {
 							unsigned width = resultType->getPrimitiveSizeInBits();
 							ref<Expr> e;
@@ -1907,7 +1907,7 @@ void SpecialFunctionHandler::handleFread(ExecutionState &state,
 					break;
 				default:
 					if(descriptor->getoffset()+size-1>=desc_size){
-						LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+						 llvm::Type *resultType = target->inst->getType();
 						if (!resultType->isVoidTy()) {
 							unsigned width = resultType->getPrimitiveSizeInBits();
 							ref<Expr> e;
@@ -2037,7 +2037,7 @@ void SpecialFunctionHandler::handleFwrite(ExecutionState &state,
 
 			for(int i = 0; i < count * size; i++){
 				if(descriptor->getoffset() >= desc_size){//eof reached, number of bytes read returned;
-					LLVM_TYPE_Q llvm::Type *resultType = target->inst->getType();
+					 llvm::Type *resultType = target->inst->getType();
 					if (!resultType->isVoidTy()) {
 						unsigned width = resultType->getPrimitiveSizeInBits();
 						ref<Expr> e;

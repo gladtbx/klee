@@ -184,7 +184,7 @@ CoreSolverToUse("solver-backend", cl::desc("Specifiy the core solver backend to 
                      clEnumValN(METASMT_SOLVER, "metasmt", "metaSMT" METASMT_IS_DEFAULT_STR),
                      clEnumValN(DUMMY_SOLVER, "dummy", "Dummy solver"),
                      clEnumValN(Z3_SOLVER, "z3", "Z3" Z3_IS_DEFAULT_STR),
-                     clEnumValN(GREEN_SOLVER, "green", "GREEN" GREEN_IS_DEFAULT_STR),
+                     clEnumValN(GREEN_SOLVER, "green", "GREEN" GREEN_IS_DEFAULT_STR)
                      KLEE_LLVM_CL_VAL_END),
     		cl::init(DEFAULT_CORE_SOLVER));
 
@@ -196,7 +196,7 @@ DebugCrossCheckCoreSolverWith("debug-crosscheck-core-solver",
              			        clEnumValN(DUMMY_SOLVER, "dummy", "Dummy solver"),
                      			clEnumValN(Z3_SOLVER, "z3", "Z3"),
                      			clEnumValN(NO_SOLVER, "none",
-                                		"Do not cross check (default)"),
+                                		"Do not cross check (default)")
                      			KLEE_LLVM_CL_VAL_END),
     				cl::init(NO_SOLVER));
 }

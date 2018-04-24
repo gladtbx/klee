@@ -10,16 +10,8 @@ add_executable(klee
   main.cpp
 )
 
-
-# FIXME: This shouldn't be done here. Instead the KLEE libraries
-# should declare their LLVM dependencies.
-set(LLVM_COMPONENTS
-	bitreader
-	bitwriter
-	engine
-	ipo
-	linker
-	support
+set(KLEE_LIBS
+  kleeCore
 )
 
 target_link_libraries(klee ${KLEE_LIBS})

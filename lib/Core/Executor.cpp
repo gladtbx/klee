@@ -1217,7 +1217,7 @@ void Executor::printDebugInstructions(ExecutionState &state) {
     state.pc->printFileLine(*stream);
     (*stream) << ":";
   }
-}
+
 
   (*stream) << state.pc->info->assemblyLine;
 

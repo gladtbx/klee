@@ -25,7 +25,7 @@ namespace {
   CoreSearch("search", cl::desc("Specify the search heuristic (default=random-path interleaved with nurs:covnew)"),
 	     cl::values(clEnumValN(Searcher::DFS, "dfs", "use Depth First Search (DFS)"),
 			clEnumValN(Searcher::BFS, "bfs", "use Breadth First Search (BFS), where scheduling decisions are taken at the level of (2-way) forks"),
-			clEnumValN(Searcher::TargetSearcher, "target-searcher", "BFS on non target functions, DFS on target functions. Use with --target-function command"),
+		//	clEnumValN(Searcher::TargetSearcher, "target-searcher", "BFS on non target functions, DFS on target functions. Use with --target-function command"),
 			clEnumValN(Searcher::RandomState, "random-state", "randomly select a state to explore"),
 			clEnumValN(Searcher::RandomPath, "random-path", "use Random Path Selection (see OSDI'08 paper)"),
 			clEnumValN(Searcher::NURS_CovNew, "nurs:covnew", "use Non Uniform Random Search (NURS) with Coverage-New"),
