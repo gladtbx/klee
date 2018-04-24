@@ -3763,7 +3763,7 @@ void Executor::runFunctionAsMain(Function *f,
   if (statsTracker)
     statsTracker->framePushed(*state, 0);
 
-  //if(LoopReduction)
+  if(LoopReduction)
 	  processLoopInfo(&f->getEntryBlock());
   assert(arguments.size() == f->arg_size() && "wrong number of arguments");
   for (unsigned i = 0, e = f->arg_size(); i != e; ++i)
