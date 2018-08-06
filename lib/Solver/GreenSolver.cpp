@@ -252,10 +252,19 @@ bool GreenSolverImpl::internalRunSolver(
 
 int GreenSolverImpl::parseResponse(const char* response,const std::vector<const Array *> *objects,
         std::vector<std::vector<unsigned char> > *values ){
-	if(response[0] != '1'){
+	if(response[0] != '1' || response[0] != '2'){
 		printf("Error, response is unsolveable\n");
 		printf("%s\n",response);
 		return 1;
+	}
+	//If the response is 1, we had a cache hit
+	//Else we had a cache miss
+	//We need to log it.
+	if(response[0] == '1'){
+		++stats::GreenCacheHit;
+	}
+	if(response[0] == '2'){
+		++stats::GreenCacheMiss;
 	}
 	printf("Getting response from Green Solver:\n");
 	printf("%s\n",response);
