@@ -1206,8 +1206,10 @@ void externalsAndGlobalsCheck(Module *m) {
 
   for (Module::const_iterator fnIt = m->begin(), fn_ie = m->end();
        fnIt != fn_ie; ++fnIt) {
-    if (fnIt->isDeclaration() && !fnIt->use_empty())
+    if (fnIt->isDeclaration() && !fnIt->use_empty()){
       externals.insert(std::make_pair(fnIt->getName(), false));
+	printf("Found Function: %s\n",fnIt->getName().str().c_str());
+	}
     for (Function::const_iterator bbIt = fnIt->begin(), bb_ie = fnIt->end();
          bbIt != bb_ie; ++bbIt) {
       for (BasicBlock::const_iterator it = bbIt->begin(), ie = bbIt->end();
@@ -1248,6 +1250,7 @@ void externalsAndGlobalsCheck(Module *m) {
          it = externals.begin(), ie = externals.end();
        it != ie; ++it) {
     const std::string &ext = it->first;
+	printf("External: %s\n",ext.c_str());
     if (!modelled.count(ext) && (WarnAllExternals ||
                                  !dontCare.count(ext))) {
       if (unsafe.count(ext)) {

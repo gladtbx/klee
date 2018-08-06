@@ -117,7 +117,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_alias_function", handleAliasFunction, false),
   add("malloc", handleMalloc, true),
   add("realloc", handleRealloc, true),
-  add("fopen",handleOpen,true),
+/*  add("fopen",handleOpen,true),
   add("fclose",handleClose,true),
   add("klee_make_IO_buffer",handleMakeIOBuffer,false),
   add("\01__isoc99_fscanf",handleFscanf,true),
@@ -132,7 +132,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   //add("printf",handleprintf,true),
   add("fputc",handleFputc,true),
   add("fread",handleFread,true),
-  add("fwrite",handleFwrite,true),
+  add("fwrite",handleFwrite,true),*/
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
@@ -196,85 +196,60 @@ void SpecialFunctionHandler::prepare() {
 
   for (unsigned i=0; i<N; ++i) {
     HandlerInfo &hi = handlerInfo[i];
-    if(strcmp(hi.name,"fopen") == 0 ){
-    	  if(!symbolicFileIO){
-    		  handlerInfo[i] = {"",NULL,false,false,false};
+/*    if(!symbolicFileIO){
+	    if(strcmp(hi.name,"fopen") == 0 ){
+    		  handlerInfo[i] = {"",NULL,false,false,true};
     		  continue;
     	  }
-    }
-    if(strcmp(hi.name,"fscanf") == 0 ){
-  	  if(!symbolicFileIO){
-  		  handlerInfo[i] = {"",NULL,false,false,false};
+	    if(strcmp(hi.name,"fscanf") == 0 ){
+  		  handlerInfo[i] = {"",NULL,false,false,true};
   		  continue;
   	  }
-    }
-    if(strcmp(hi.name,"\01__isoc99_fscanf") == 0 ){
-	  if(!symbolicFileIO){
-		  handlerInfo[i] = {"",NULL,false,false,false};
+	    if(strcmp(hi.name,"\01__isoc99_fscanf") == 0 ){
+		  handlerInfo[i] = {"",NULL,false,false,true};
 		  continue;
 	  }
-    }
-    if(strcmp(hi.name,"\01__isoc99_sscanf") == 0 ){
-	  if(!symbolicFileIO){
-		  handlerInfo[i] = {"",NULL,false,false,false};
+	    if(strcmp(hi.name,"\01__isoc99_sscanf") == 0 ){
+		  handlerInfo[i] = {"",NULL,false,false,true};
 		  continue;
 	  }
-    }
-    if(strcmp(hi.name,"__isoc99_fscanf") == 0 ){
-  	  if(!symbolicFileIO){
-  		  handlerInfo[i] = {"",NULL,false,false,false};
+	    if(strcmp(hi.name,"__isoc99_fscanf") == 0 ){
+  		  handlerInfo[i] = {"",NULL,false,false,true};
   		  continue;
   	  }
-    }
-    if(strcmp(hi.name,"__isoc99_sscanf") == 0 ){
-  	  if(!symbolicFileIO){
-  		  handlerInfo[i] = {"",NULL,false,false,false};
+ 	   if(strcmp(hi.name,"__isoc99_sscanf") == 0 ){
+  		  handlerInfo[i] = {"",NULL,false,false,true};
   		  continue;
   	  }
-    }
-    if(strcmp(hi.name,"fputc") == 0 ){
-   	  if(!symbolicFileIO){
-   		  handlerInfo[i] = {"",NULL,false,false,false};
+	    if(strcmp(hi.name,"fputc") == 0 ){
+   		  handlerInfo[i] = {"",NULL,false,false,true};
    		  continue;
    	  }
-     }
-    if(strcmp(hi.name,"fprintf") == 0 ){
-	  if(!symbolicFileIO){
-		  handlerInfo[i] = {"",NULL,false,false,false};
+	    if(strcmp(hi.name,"fprintf") == 0 ){
+		  handlerInfo[i] = {"",NULL,false,false,true};
 		  continue;
 	  }
-    }
-    if(strcmp(hi.name,"printf") == 0 ){
-	  if(!symbolicFileIO){
-		  handlerInfo[i] = {"",NULL,false,false,false};
+	    if(strcmp(hi.name,"printf") == 0 ){
+		  handlerInfo[i] = {"",NULL,false,false,true};
 		  continue;
 	  }
-    }
-    if(strcmp(hi.name,"fclose") == 0 ){
-	  if(!symbolicFileIO){
-		  handlerInfo[i] = {"",NULL,false,false,false};
+	    if(strcmp(hi.name,"fclose") == 0 ){
+		  handlerInfo[i] = {"",NULL,false,false,true};
 		  continue;
 	  }
-    }
-    if(strcmp(hi.name,"fread") == 0 ){
-    	if(!symbolicFileIO){
-  		  handlerInfo[i] = {"",NULL,false,false,false};
+	    if(strcmp(hi.name,"fread") == 0 ){
+  		  handlerInfo[i] = {"",NULL,false,false,true};
   		  continue;
     	}
-    }
-    if(strcmp(hi.name,"fwrite") == 0 ){
-    	if(!symbolicFileIO){
-  		  handlerInfo[i] = {"",NULL,false,false,false};
+    	if(strcmp(hi.name,"fwrite") == 0 ){
+  		  handlerInfo[i] = {"",NULL,false,false,true};
   		  continue;
     	}
-    }
-    if(strcmp(hi.name,"sscanf") == 0 ){
-       	if(!symbolicFileIO){
-   		  handlerInfo[i] = {"",NULL,false,false,false};
+    	if(strcmp(hi.name,"sscanf") == 0 ){
+   		  handlerInfo[i] = {"",NULL,false,false,true};
    		  continue;
      	}
-    }
-
+    }*/
     Function *f = executor.kmodule->module->getFunction(hi.name);
 
     // No need to create if the function doesn't exist, since it cannot
@@ -300,7 +275,7 @@ void SpecialFunctionHandler::bind() {
   for (unsigned i=0; i<N; ++i) {
     HandlerInfo &hi = handlerInfo[i];
     Function *f = executor.kmodule->module->getFunction(hi.name);
-    
+   printf("SPNAME: %s\n",hi.name); 
     if (f && (!hi.doNotOverride || f->isDeclaration()))
       handlers[f] = std::make_pair(hi.handler, hi.hasReturnValue);
   }
