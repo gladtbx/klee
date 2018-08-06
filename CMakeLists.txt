@@ -77,7 +77,7 @@ endif()
 ################################################################################
 if ("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
   message(FATAL_ERROR "In source builds are not allowed. You should invoke "
-          "CMake from a different directory.")
+          "CMake from a different directory. You are building in ${CMAKE_BINARY_DIR}, source is in ${CMAKE_SOURCE_DIR}")
 endif()
 
 ################################################################################
