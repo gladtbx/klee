@@ -420,7 +420,8 @@ void StatsTracker::writeStatsHeader() {
              << "'CexCacheTime',"
              << "'ForkTime',"
              << "'ResolveTime',"
-             << "'CachedConstraintsHit',"
+             << "'GreenCacheHit',"
+             << "'GreenCacheMiss',"
 #ifdef DEBUG
 	     << "'ArrayHashTime',"
 #endif
@@ -451,7 +452,8 @@ void StatsTracker::writeStatsLine() {
              << "," << stats::cexCacheTime / 1000000.
              << "," << stats::forkTime / 1000000.
              << "," << stats::resolveTime / 1000000.
-             << "," << stats::cachedConstraintsHit
+             << "," << stats::GreenCacheHit
+             << "," << stats::GreenCacheMiss
 #ifdef DEBUG
              << "," << stats::arrayHashTime / 1000000.
 #endif
