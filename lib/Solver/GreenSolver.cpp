@@ -252,7 +252,7 @@ bool GreenSolverImpl::internalRunSolver(
 
 int GreenSolverImpl::parseResponse(const char* response,const std::vector<const Array *> *objects,
         std::vector<std::vector<unsigned char> > *values ){
-	if(response[0] != '1' || response[0] != '2'){
+	if(response[0] != '1' && response[0] != '2'){
 		printf("Error, response is unsolveable\n");
 		printf("%s\n",response);
 		return 1;
