@@ -1243,7 +1243,7 @@ void Executor::stepInstruction(ExecutionState &state) {
   ++stats::instructions;
   state.prevPC = state.pc;
   ++state.pc;
-  printf("Current at line: %d\n", state.pc->info->line);
+  printf("Current at line: %d; %d\n", state.pc->info->line, state.pc->info->assemblyLine);
   if (stats::instructions==StopAfterNInstructions)
     haltExecution = true;
 }
