@@ -117,7 +117,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   add("klee_alias_function", handleAliasFunction, false),
   add("malloc", handleMalloc, true),
   add("realloc", handleRealloc, true),
-/*  add("fopen",handleOpen,true),
+  add("fopen",handleOpen,true),
   add("fclose",handleClose,true),
   add("klee_make_IO_buffer",handleMakeIOBuffer,false),
   add("\01__isoc99_fscanf",handleFscanf,true),
@@ -132,7 +132,7 @@ static SpecialFunctionHandler::HandlerInfo handlerInfo[] = {
   //add("printf",handleprintf,true),
   add("fputc",handleFputc,true),
   add("fread",handleFread,true),
-  add("fwrite",handleFwrite,true),*/
+  add("fwrite",handleFwrite,true),
 
   // operator delete[](void*)
   add("_ZdaPv", handleDeleteArray, false),
