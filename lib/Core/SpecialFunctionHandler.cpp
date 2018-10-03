@@ -196,7 +196,7 @@ void SpecialFunctionHandler::prepare() {
 
   for (unsigned i=0; i<N; ++i) {
     HandlerInfo &hi = handlerInfo[i];
-/*    if(!symbolicFileIO){
+    if(!symbolicFileIO){
 	    if(strcmp(hi.name,"fopen") == 0 ){
     		  handlerInfo[i] = {"",NULL,false,false,true};
     		  continue;
@@ -249,7 +249,7 @@ void SpecialFunctionHandler::prepare() {
    		  handlerInfo[i] = {"",NULL,false,false,true};
    		  continue;
      	}
-    }*/
+    }
     Function *f = executor.kmodule->module->getFunction(hi.name);
 
     // No need to create if the function doesn't exist, since it cannot
