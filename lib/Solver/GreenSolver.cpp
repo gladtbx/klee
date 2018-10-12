@@ -266,6 +266,7 @@ int GreenSolverImpl::parseResponse(const char* response,const std::vector<const 
 	if(response[0] == '2'){
 		++stats::GreenCacheMiss;
 	}
+	++stats::queries;
 	printf("Getting response from Green Solver:\n");
 	printf("%s\n",response);
 	std::stringstream mappingStream(&response[2]);
