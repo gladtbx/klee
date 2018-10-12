@@ -23,10 +23,10 @@ Statistic stats::queryConstructTime("QueryConstructTime", "QBtime") ;
 Statistic stats::queryConstructs("QueriesConstructs", "QB");
 Statistic stats::queryCounterexamples("QueriesCEX", "Qcex");
 Statistic stats::queryTime("QueryTime", "Qtime");
-Statistic stats::GreenCacheHitSAT("GreenCacheHit","GCHSAT");
-Statistic stats::GreenCacheMissSAT("GreenCacheMiss","GCMSAT");
-Statistic stats::GreenCacheHitUNSAT("GreenCacheHit","GCHUNSAT");
-Statistic stats::GreenCacheMissUNSAT("GreenCacheMiss","GCMUNSAT");
+Statistic stats::GreenCacheHitSAT("GreenCacheHitSAT","GCHSAT");
+Statistic stats::GreenCacheMissSAT("GreenCacheMissSAT","GCMSAT");
+Statistic stats::GreenCacheHitUNSAT("GreenCacheHitUNSAT","GCHUNSAT");
+Statistic stats::GreenCacheMissUNSAT("GreenCacheMissUNSAT","GCMUNSAT");
 
 #ifdef DEBUG
 Statistic stats::arrayHashTime("ArrayHashTime", "AHtime");

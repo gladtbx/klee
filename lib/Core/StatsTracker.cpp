@@ -414,8 +414,10 @@ void StatsTracker::writeStatsHeader() {
              << "'ResolveTime',"
              << "'QueryCexCacheMisses',"
              << "'QueryCexCacheHits',"
-             << "'GreenCacheHit',"
-             << "'GreenCacheMiss',"
+             << "'GreenCacheHitSAT',"
+             << "'GreenCacheMissSAT',"
+             << "'GreenCacheHitUNSAT',"
+             << "'GreenCacheMissUNSAT',"
 #ifdef DEBUG
 	     << "'ArrayHashTime',"
 #endif
@@ -448,8 +450,10 @@ void StatsTracker::writeStatsLine() {
              << "," << stats::resolveTime / 1000000.
              << "," << stats::queryCexCacheMisses
              << "," << stats::queryCexCacheHits
-             << "," << stats::GreenCacheHit
-             << "," << stats::GreenCacheMiss
+             << "," << stats::GreenCacheHitSAT
+             << "," << stats::GreenCacheMissSAT
+             << "," << stats::GreenCacheHitUNSAT
+             << "," << stats::GreenCacheMissUNSAT
 #ifdef DEBUG
              << "," << stats::arrayHashTime / 1000000.
 #endif
