@@ -229,9 +229,16 @@ bool GreenSolverImpl::internalRunSolver(
 		return false;
 	}
 	//If the received message is 0, it means not sat.
-	if(recv[0] == '0'){
+	if(recv[0] == '3'){
 		runStatusCode = SOLVER_RUN_STATUS_SUCCESS_UNSOLVABLE;
 		hasSolution= false;
+		++stats::GreenCacheHitUNSAT;
+		return true;
+	}
+	if(recv[0] == '4'){
+		runStatusCode = SOLVER_RUN_STATUS_SUCCESS_UNSOLVABLE;
+		hasSolution= false;
+		++stats::GreenCacheMissUNSAT;
 		return true;
 	}
 	if(!objects){
@@ -261,10 +268,10 @@ int GreenSolverImpl::parseResponse(const char* response,const std::vector<const 
 	//Else we had a cache miss
 	//We need to log it.
 	if(response[0] == '1'){
-		++stats::GreenCacheHit;
+		++stats::GreenCacheHitSAT;
 	}
 	if(response[0] == '2'){
-		++stats::GreenCacheMiss;
+		++stats::GreenCacheMissSAT;
 	}
 	++stats::queries;
 	printf("Getting response from Green Solver:\n");
