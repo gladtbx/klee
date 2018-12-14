@@ -81,7 +81,7 @@ private:
   	if (connect(green_socket, (struct sockaddr *) &server, sizeof(server)) < 0) {
   		report_and_die("connect() failed");
   	}
-  	timelog = fopen("/home/Documents/runtimestats/ctime","a");
+  	timelog = fopen("/home/gladtbx/Documents/runtimestats/ctime","a");
   	if(!timelog){
   		report_and_die("Fopen failed");
   	}
