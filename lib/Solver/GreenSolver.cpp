@@ -115,7 +115,7 @@ private:
   		return 2;
   	}
   	std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
-  	totaltime += std::chrono::duration_cast<std::chrono::microseconds> (e-s).count();
+  	totaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
 
   	result[bytes_rcvd]=NULL;
   	return 0;
