@@ -23,6 +23,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <chrono>
+#include <stdio.h>
 
 #define GREEN_BUFSIZE (4096)
 
@@ -43,6 +45,9 @@ private:
 
   int green_socket;
 
+  FILE* timelog;
+
+  long int totaltime = 0;
   /**
    * Error reporting routine.
    */
@@ -76,6 +81,7 @@ private:
   	if (connect(green_socket, (struct sockaddr *) &server, sizeof(server)) < 0) {
   		report_and_die("connect() failed");
   	}
+  	timelog = fopen("~/Documents/runtimestats/ctime","a");
   }
 
   void green_shutdown() {
@@ -83,6 +89,8 @@ private:
   		// do nothing
   	}
   	close(green_socket);
+  	fprintf(timelog, "%ld\n",totaltime);
+  	fclose(timelog);
   	exit(0);
   }
 
@@ -93,7 +101,7 @@ private:
   	query_len = strlen(query);
   	printf("Sending query: ");
   	printf("%s \n",query);
-
+  	std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
   	if (send(green_socket, query, query_len, 0) != query_len) {
   		report_and_die("send() sent a different number of bytes than expected");
   		return 1;
@@ -103,6 +111,9 @@ private:
   		report_and_die("recv() failed or connection closed prematurely");
   		return 2;
   	}
+  	std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+  	totaltime += std::chrono::duration_cast<std::chrono::microseconds> (e-s).count();
+
   	result[bytes_rcvd]=NULL;
   	return 0;
   }
