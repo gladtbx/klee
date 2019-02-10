@@ -171,9 +171,12 @@ char * GreenSolverImpl::getConstraintLog(const Query &query) {
 }
 
 bool GreenSolverImpl::computeTruth(const Query &query, bool &isValid){
+	  std::vector<const Array *> objects;
+	  std::vector<std::vector<unsigned char> > values;
 	  bool hasSolution;
+	  findSymbolicObjects(query.expr, objects);
 	  bool status =
-	      internalRunSolver(query, /*objects=*/NULL, /*values=*/NULL, hasSolution);
+			  internalRunSolver(query.withFalse(), &objects, &values, hasSolution);
 	  isValid = !hasSolution;
 	  return status;
 }
