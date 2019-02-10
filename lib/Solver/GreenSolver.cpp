@@ -177,7 +177,7 @@ bool GreenSolverImpl::computeTruth(const Query &query, bool &isValid){
 	  findSymbolicObjects(query.expr, objects);
 	  bool status =
 			  internalRunSolver(query.withFalse(), &objects, &values, hasSolution);
-	  isValid = !hasSolution;
+	  isValid = hasSolution;
 	  return status;
 }
 
