@@ -23,6 +23,11 @@
 #include <vector>
 #include <ostream>
 #include <list>
+#include <unistd.h>
+#include <chrono>
+#include <stdio.h>
+
+
 
 using namespace klee;
 using namespace llvm;
@@ -393,11 +398,22 @@ void calculateArrayReferences(const IndependentElementSet & ie,
 class IndependentSolver : public SolverImpl {
 private:
   Solver *solver;
+  long totaltime;
+  FILE* timelog;
 
 public:
   IndependentSolver(Solver *_solver) 
-    : solver(_solver) {}
-  ~IndependentSolver() { delete solver; }
+    : solver(_solver), totaltime(0) {
+	 timelog = fopen("/home/gladtbx/Documents/runtimestats/indSolvertime","a");
+	 if(!timelog){
+	  	assert(0 && "Fopen for indepent solver log failed");
+	 }
+  }
+  ~IndependentSolver() {
+	  delete solver;
+	  fprintf(timelog, "%ld\n",totaltime);
+	  fclose(timelog);
+  }
 
   bool computeTruth(const Query&, bool &isValid);
   bool computeValidity(const Query&, Solver::Validity &result);
@@ -413,28 +429,40 @@ public:
   
 bool IndependentSolver::computeValidity(const Query& query,
                                         Solver::Validity &result) {
+  std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+
   std::vector< ref<Expr> > required;
   IndependentElementSet eltsClosure =
     getIndependentConstraints(query, required);
   ConstraintManager tmp(required);
+  std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+  totaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
   return solver->impl->computeValidity(Query(tmp, query.expr), 
                                        result);
 }
 
 bool IndependentSolver::computeTruth(const Query& query, bool &isValid) {
   std::vector< ref<Expr> > required;
+  std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+
   IndependentElementSet eltsClosure = 
     getIndependentConstraints(query, required);
   ConstraintManager tmp(required);
+  std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+  totaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
   return solver->impl->computeTruth(Query(tmp, query.expr), 
                                     isValid);
 }
 
 bool IndependentSolver::computeValue(const Query& query, ref<Expr> &result) {
   std::vector< ref<Expr> > required;
+  std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+
   IndependentElementSet eltsClosure = 
     getIndependentConstraints(query, required);
   ConstraintManager tmp(required);
+  std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+  totaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
   return solver->impl->computeValue(Query(tmp, query.expr), result);
 }
 
@@ -476,6 +504,8 @@ bool IndependentSolver::computeInitialValues(const Query& query,
                                              const std::vector<const Array*> &objects,
                                              std::vector< std::vector<unsigned char> > &values,
                                              bool &hasSolution){
+  std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+
   // We assume the query has a solution except proven differently
   // This is important in case we don't have any constraints but
   // we need initial values for requested array objects.
@@ -483,6 +513,9 @@ bool IndependentSolver::computeInitialValues(const Query& query,
   // FIXME: When we switch to C++11 this should be a std::unique_ptr so we don't need
   // to remember to manually call delete
   std::list<IndependentElementSet> *factors = getAllIndependentConstraintsSets(query);
+
+  std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+  totaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
 
   //Used to rearrange all of the answers into the correct order
   std::map<const Array*, std::vector<unsigned char> > retMap;
