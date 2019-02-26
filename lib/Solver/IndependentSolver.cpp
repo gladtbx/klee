@@ -410,9 +410,9 @@ public:
 	 }
   }
   ~IndependentSolver() {
-	  delete solver;
 	  fprintf(timelog, "%ld\n",totaltime);
 	  fclose(timelog);
+	  delete solver;
   }
 
   bool computeTruth(const Query&, bool &isValid);

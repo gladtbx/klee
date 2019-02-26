@@ -92,7 +92,12 @@ public:
 		  	assert(0 && "Fopen for caching solver log failed");
 		 }
   }
-  ~CachingSolver() { cache.clear(); delete solver; }
+  ~CachingSolver() {
+	  cache.clear();
+	  fprintf(timelog, "%ld\n",totaltime);
+	  fclose(timelog);
+	  delete solver;
+  }
 
   bool computeValidity(const Query&, Solver::Validity &result);
   bool computeTruth(const Query&, bool &isValid);

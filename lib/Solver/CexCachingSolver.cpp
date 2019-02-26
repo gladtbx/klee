@@ -279,6 +279,8 @@ bool CexCachingSolver::getAssignment(const Query& query, Assignment *&result) {
 
 CexCachingSolver::~CexCachingSolver() {
   cache.clear();
+  fprintf(timelog, "%ld\n",totaltime);
+  fclose(timelog);
   delete solver;
   for (assignmentsTable_ty::iterator it = assignmentsTable.begin(), 
          ie = assignmentsTable.end(); it != ie; ++it)
