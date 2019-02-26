@@ -404,7 +404,7 @@ private:
 public:
   IndependentSolver(Solver *_solver) 
     : solver(_solver), totaltime(0) {
-	 timelog = fopen("/home/gladtbx/Documents/runtimestats/indSolvertime","a");
+	 timelog = fopen("/home/gladtbx/Documents/runtimestats/IndSolvertime","a");
 	 if(!timelog){
 	  	assert(0 && "Fopen for indepent solver log failed");
 	 }

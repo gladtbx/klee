@@ -77,9 +77,17 @@ private:
   cache_map cache;
 
   std::set<ref<Expr> > cachedConstraints;
+  FILE* timelog;
+  long totaltime;
+
 
 public:
-  CachingSolver(Solver *s, std::set<ref<Expr> > _cachedConstraints) : solver(s), cachedConstraints(_cachedConstraints) {}
+  CachingSolver(Solver *s, std::set<ref<Expr> > _cachedConstraints) : solver(s), cachedConstraints(_cachedConstraints),totaltime(0) {
+		 timelog = fopen("/home/gladtbx/Documents/runtimestats/CachingSolvertime","a");
+		 if(!timelog){
+		  	assert(0 && "Fopen for caching solver log failed");
+		 }
+  }
   ~CachingSolver() { cache.clear(); delete solver; }
 
   bool computeValidity(const Query&, Solver::Validity &result);
@@ -163,6 +171,8 @@ bool CachingSolver::checkCacheHit(ref<Expr> q){
     value result only valid on a cache hit. */
 bool CachingSolver::cacheLookup(const Query& query,
                                 IncompleteSolver::PartialValidity &result) {
+  std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+
   bool negationUsed;
   ref<Expr> canonicalQuery = canonicalizeQuery(query.expr, negationUsed);
 
@@ -179,7 +189,8 @@ bool CachingSolver::cacheLookup(const Query& query,
   //We should be able to improve hit rate?
   //We have to make sure the cache entries are True.
   cache_map::iterator it = cache.find(ce);
-  
+  std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+  totaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
   if (it != cache.end()) {
     result = (negationUsed ?
               IncompleteSolver::negatePartialValidity(it->second) :
@@ -194,6 +205,8 @@ bool CachingSolver::cacheLookup(const Query& query,
 void CachingSolver::cacheInsert(const Query& query,
                                 IncompleteSolver::PartialValidity result) {
   bool negationUsed;
+  std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+
   ref<Expr> canonicalQuery = canonicalizeQuery(query.expr, negationUsed);
 
   CacheEntry ce(query.constraints, canonicalQuery);
@@ -201,6 +214,8 @@ void CachingSolver::cacheInsert(const Query& query,
     (negationUsed ? IncompleteSolver::negatePartialValidity(result) : result);
   
   cache.insert(std::make_pair(ce, cachedResult));
+  std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+  totaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
 }
 
 bool CachingSolver::computeValidity(const Query& query,

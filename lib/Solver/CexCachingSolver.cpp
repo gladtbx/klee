@@ -80,8 +80,16 @@ class CexCachingSolver : public SolverImpl {
 
   bool getAssignment(const Query& query, Assignment *&result);
   
+  long totaltime;
+  FILE* timelog;
+
 public:
-  CexCachingSolver(Solver *_solver) : solver(_solver) {}
+  CexCachingSolver(Solver *_solver) : solver(_solver),totaltime(0) {
+	  timelog = fopen("/home/gladtbx/Documents/runtimestats/CexSolvertime","a");
+	  if(!timelog){
+	   	assert(0 && "Fopen for Cex solver log failed");
+	  }
+  }
   ~CexCachingSolver();
   
   bool computeTruth(const Query&, bool &isValid);
@@ -119,12 +127,18 @@ struct NullOrSatisfyingAssignment {
 /// searchForAssignment - Look for a cached solution for a query.
 ///
 /// \param key - The query to look up.
-/// \param result [out] - The cached result, if the lookup is succesful. This is
+/// \param result [out] - The cached result, if the lookup is successful. This is
 /// either a satisfying assignment (for a satisfiable query), or 0 (for an
 /// unsatisfiable query).
 /// \return - True if a cached result was found.
 bool CexCachingSolver::searchForAssignment(KeyType &key, Assignment *&result) {
+  std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+
   Assignment * const *lookup = cache.lookup(key);
+
+  std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+  totaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+
   if (lookup) {
     result = *lookup;
     return true;
