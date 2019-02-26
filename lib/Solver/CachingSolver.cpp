@@ -80,13 +80,12 @@ private:
   Solver *solver;
   cache_map cache;
 
-  std::set<ref<Expr> > cachedConstraints;
   FILE* timelog;
   long totaltime;
 
 
 public:
-  CachingSolver(Solver *s, std::set<ref<Expr> > _cachedConstraints) : solver(s), cachedConstraints(_cachedConstraints),totaltime(0) {
+  CachingSolver(Solver *s) : solver(s), totaltime(0) {
 		 timelog = fopen("/home/gladtbx/Documents/runtimestats/CachingSolvertime","a");
 		 if(!timelog){
 		  	assert(0 && "Fopen for caching solver log failed");
@@ -160,20 +159,6 @@ bool compareExpr(ref<Expr> l, ref<Expr> r){
 		}
 	}
 	return true;
-}
-
-bool CachingSolver::checkCacheHit(ref<Expr> q){
-	printf("Checking if cache hit for: \n");
-	q->dump();
-	for(std::set<ref<Expr> >::iterator it = cachedConstraints.begin(), itEnd =cachedConstraints.end();
-		it != itEnd; it++){
-		printf("Constraints now:\n");
-		(*it)->dump();
-		if(compareExpr(*it,q)){
-			return true;
-		}
-	}
-	return false;
 }
 
 /** @returns true on a cache hit, false of a cache miss.  Reference
@@ -344,6 +329,6 @@ void CachingSolver::setCoreSolverTimeout(double timeout) {
 
 ///
 
-Solver *klee::createCachingSolver(Solver *_solver, std::set<ref<Expr> > cachedConstraints) {
-  return new Solver(new CachingSolver(_solver, cachedConstraints));
+Solver *klee::createCachingSolver(Solver *_solver) {
+  return new Solver(new CachingSolver(_solver));
 }

@@ -26,8 +26,7 @@ namespace klee {
                                  std::string querySMT2LogPath,
                                  std::string baseSolverQuerySMT2LogPath,
                                  std::string queryKQueryLogPath,
-                                 std::string baseSolverQueryKQueryLogPath,
-                                 std::set<ref<Expr> > cachedConstraints = std::set<ref<Expr> >());
+                                 std::string baseSolverQueryKQueryLogPath);
 }
 
 

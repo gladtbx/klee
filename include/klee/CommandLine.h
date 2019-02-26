@@ -35,9 +35,7 @@ extern llvm::cl::opt<bool> UseAssignmentValidatingSolver;
 
 extern llvm::cl::opt<std::string> TargetFuntion;
 
-extern llvm::cl::list<std::string> LoadCacheFile;
-
-extern llvm::cl::list<std::string> LoadCacheDir;
+extern llvm::cl::opt<bool> UseCCacheSolver;
 
 ///The different query logging solvers that can switched on/off
 enum QueryLoggingSolverType

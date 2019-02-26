@@ -85,6 +85,11 @@ cl::opt<bool>
 UseAssignmentValidatingSolver("debug-assignment-validating-solver",
                               cl::init(false));
 
+cl::opt<bool>
+UseCCacheSolver("use-cCache-solver",
+					cl::desc("Use Centralized Cache across multiple executions of KLEE"),
+					cl::init(false));
+
 void KCommandLine::HideUnrelatedOptions(cl::OptionCategory &Category) {
   StringMap<cl::Option *> map;
   cl::getRegisteredOptions(map);
@@ -103,14 +108,6 @@ void KCommandLine::HideUnrelatedOptions(
        i != e; i++)
     HideUnrelatedOptions(*i);
 }
-
-llvm::cl::list<std::string> LoadCacheFile("loadCacheFile",
-                llvm::cl::desc("Specify a cache file to load"),
-                llvm::cl::value_desc("cache file"));
-
-llvm::cl::list<std::string> LoadCacheDir("loadCacheDir",
-                llvm::cl::desc("Specify a cache dir to load"),
-                llvm::cl::value_desc("cache dir"));
 
 #ifdef ENABLE_METASMT
 

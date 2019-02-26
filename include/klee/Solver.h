@@ -262,7 +262,7 @@ class GreenSolver : public Solver {
   /// memory (without eviction).
   ///
   /// \param s - The underlying solver to use.
-  Solver *createCachingSolver(Solver *s, std::set<ref<Expr> > cachedConstraints = std::set<ref<Expr> >());
+  Solver *createCachingSolver(Solver *s);
 
   /// createCexCachingSolver - Create a counterexample caching solver. This is a
   /// more sophisticated cache which records counterexamples for a constraint
@@ -303,6 +303,9 @@ class GreenSolver : public Solver {
 
   // Create a solver based on the supplied ``CoreSolverType``.
   Solver *createCoreSolver(CoreSolverType cst);
+
+  // Create a centralized cache solver that live across different runs of KLEE
+  Solver *createCCacheSolver(Solver *s);
 }
 
 #endif

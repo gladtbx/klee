@@ -305,6 +305,8 @@ include(${CMAKE_SOURCE_DIR}/cmake/find_z3.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/find_metasmt.cmake)
 # Green
 include(${CMAKE_SOURCE_DIR}/cmake/green.cmake)
+#cCache
+include(${CMAKE_SOURCE_DIR}/cmake/cCache.cmake)
 
 if ((NOT ${ENABLE_Z3}) AND (NOT ${ENABLE_STP}) AND (NOT ${ENABLE_METASMT}) AND (NOT ${ENABLE_GREEN}) )
   message(FATAL_ERROR "No solver was specified. At least one solver is required."
