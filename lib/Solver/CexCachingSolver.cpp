@@ -26,6 +26,10 @@
 
 #include "llvm/Support/CommandLine.h"
 
+#include <unistd.h>
+#include <chrono>
+#include <stdio.h>
+
 using namespace klee;
 using namespace llvm;
 

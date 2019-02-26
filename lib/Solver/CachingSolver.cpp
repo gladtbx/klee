@@ -18,6 +18,10 @@
 #include "klee/SolverStats.h"
 #include "llvm/Support/Casting.h"
 
+#include <unistd.h>
+#include <chrono>
+#include <stdio.h>
+
 #include <ciso646>
 #ifdef _LIBCPP_VERSION
 #include <unordered_map>
