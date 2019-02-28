@@ -96,7 +96,7 @@ private:
 	    	printer.setOutput(queryBuffer);
 	    	printer.setQuery(_query);
     	    printer.generateOutput();
-
+    	    queryBuffer.flush();
     	    const char* query= ("check "+BufferString).c_str();
 	      	query_len = strlen(query);
 	      	printf("Sending query: ");
@@ -141,6 +141,7 @@ private:
 			printer.setOutput(queryBuffer);
 	    	printer.setQuery(_query);
     	    printer.generateOutput();
+    	    queryBuffer.flush();
 
 			const char* query= ("insert "+ temp.str() +" "+BufferString).c_str();
 			int query_len = strlen(query);
