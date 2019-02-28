@@ -88,15 +88,15 @@ private:
 	      	char _result[BUFSIZE];
 
 	        //bool negationUsed;
-	        //ref<Expr> canonicalQuery = canonicalizeQuery(_query.expr, negationUsed);
-	      	negationUsed = false;
+	        ref<Expr> canonicalQuery = canonicalizeQuery(_query.expr, negationUsed);
 
 	        std::string BufferString;
 	    	llvm::raw_string_ostream queryBuffer(BufferString);
 	    	printer.setOutput(queryBuffer);
-	    	printer.setQuery(_query);
+	    	printer.setQuery(Query(_query.constraints,canonicalQuery));
     	    printer.generateOutput();
     	    queryBuffer.flush();
+
     	    const char* query= ("check "+BufferString).c_str();
 	      	query_len = strlen(query);
 	      	printf("Sending query: ");
@@ -126,11 +126,10 @@ private:
 			bool negationUsed;
 			std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
 
-			//ref<Expr> canonicalQuery = canonicalizeQuery(_query.expr, negationUsed);
-
-			//IncompleteSolver::PartialValidity cachedResult =
-			  //(negationUsed ? IncompleteSolver::negatePartialValidity(result) : result);
-			int cR = result + 2;
+			ref<Expr> canonicalQuery = canonicalizeQuery(_query.expr, negationUsed);
+			IncompleteSolver::PartialValidity cachedResult =
+			  (negationUsed ? IncompleteSolver::negatePartialValidity(result) : result);
+			int cR = cachedResult + 2;
 			std::ostringstream temp;
 			temp << (cR);
 			/*
@@ -139,7 +138,7 @@ private:
 			std::string BufferString;
 			llvm::raw_string_ostream queryBuffer(BufferString);
 			printer.setOutput(queryBuffer);
-	    	printer.setQuery(_query);
+	    	printer.setQuery(Query(_query.constraints,canonicalQuery));
     	    printer.generateOutput();
     	    queryBuffer.flush();
 
