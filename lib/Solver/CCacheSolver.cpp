@@ -97,7 +97,9 @@ private:
     	    printer.generateOutput();
     	    queryBuffer.flush();
 
-    	    const char* query= ("check "+BufferString).c_str();
+    	    std::string iq = "check "+BufferString;
+
+    	    const char* query= iq.c_str();
 	      	query_len = strlen(query);
 	      	printf("Sending query: ");
 	      	printf("%s \n",query);
