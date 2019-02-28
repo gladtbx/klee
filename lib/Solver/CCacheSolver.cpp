@@ -217,9 +217,9 @@ bool CcacheSolver::computeValidity(const Query& query,
   char charresult[2];
   bool negationUsed;
   bool tmp, cacheHit = check_ccache(query, charresult,negationUsed);
-  cachedResult = parseValidity(charresult,negationUsed);
 
   if (cacheHit) {
+	cachedResult = parseValidity(charresult,negationUsed);
     switch(cachedResult) {
     case IncompleteSolver::MustBeTrue:
       result = Solver::True;
@@ -289,7 +289,9 @@ bool CcacheSolver::computeTruth(const Query& query,
   char charresult[2];
   bool negationUsed;
   bool cacheHit = check_ccache(query, charresult,negationUsed);
-  cachedResult = parseValidity(charresult,negationUsed);
+  if(cacheHit){
+	  cachedResult = parseValidity(charresult,negationUsed);
+  }
 
 
   // a cached result of MayBeTrue forces us to check whether
