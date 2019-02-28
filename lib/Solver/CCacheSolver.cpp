@@ -94,7 +94,7 @@ private:
 	        std::string BufferString;
 	    	llvm::raw_string_ostream queryBuffer(BufferString);
 	    	printer.setOutput(queryBuffer);
-	    	printer.setQuery(Query(_query.constraints,_query));
+	    	printer.setQuery(_query);
     	    printer.generateOutput();
 
     	    const char* query= ("check "+BufferString).c_str();
@@ -139,7 +139,7 @@ private:
 			std::string BufferString;
 			llvm::raw_string_ostream queryBuffer(BufferString);
 			printer.setOutput(queryBuffer);
-	    	printer.setQuery(Query(_query.constraints,_query));
+	    	printer.setQuery(_query);
     	    printer.generateOutput();
 
 			const char* query= ("insert "+ temp.str() +" "+BufferString).c_str();
