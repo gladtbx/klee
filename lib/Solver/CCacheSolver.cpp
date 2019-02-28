@@ -46,7 +46,7 @@ private:
 	    	memset(&server, 0, sizeof(server));              /* Zero out structure */
 	    	server.sin_family      = AF_INET;                /* Internet address family */
 	    	server.sin_addr.s_addr = inet_addr("127.0.0.1"); /* Server IP address */
-	    	server.sin_port        = htons(port);            /* Server port */
+	    	server.sin_port        = port;            /* Server port */
 
 	    	/* Establish the connection to the echo server */
 	    	if (connect(ccache_socket, (struct sockaddr *) &server, sizeof(server)) < 0) {
