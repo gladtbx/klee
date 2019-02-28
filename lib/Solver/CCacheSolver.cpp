@@ -101,8 +101,8 @@ private:
 
     	    const char* query= iq.c_str();
 	      	query_len = strlen(query);
-	      	printf("Sending query: ");
-	      	printf("%s \n",query);
+	      	//printf("Sending query: ");
+	      	//printf("%s \n",query);
 	      	std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
 	      	if (send(ccache_socket, query, query_len, 0) != query_len) {
 	      		report_and_die("send() sent a different number of bytes than expected");
@@ -148,8 +148,8 @@ private:
 
 			const char* query= iq.c_str();
 			int query_len = strlen(query);
-	      	printf("Inserting query: ");
-	      	printf("%s \n",query);
+	      	//printf("Inserting query: ");
+	      	//printf("%s \n",query);
 
 	      	if (send(ccache_socket, query, query_len, 0) != query_len) {
 	      		report_and_die("send() sent a different number of bytes than expected");
