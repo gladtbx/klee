@@ -241,6 +241,7 @@ class GreenSolver : public Solver {
 };
 #endif
 
+
   /* *** */
 
   /// createValidatingSolver - Create a solver which will validate all query

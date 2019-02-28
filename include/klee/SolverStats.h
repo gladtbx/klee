@@ -27,11 +27,8 @@ namespace stats {
   extern Statistic queryConstructs;
   extern Statistic queryCounterexamples;
   extern Statistic queryTime;
-  extern Statistic GreenCacheHitSAT;
-  extern Statistic GreenCacheMissSAT;
-  extern Statistic GreenCacheHitUNSAT;
-  extern Statistic GreenCacheMissUNSAT;
-
+  //extern Statistic CCacheHit;
+  //extern Statistic CCacheMiss;
   
 #ifdef DEBUG
   extern Statistic arrayHashTime;

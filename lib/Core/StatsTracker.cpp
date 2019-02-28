@@ -450,10 +450,10 @@ void StatsTracker::writeStatsLine() {
              << "," << stats::resolveTime / 1000000.
              << "," << stats::queryCexCacheMisses
              << "," << stats::queryCexCacheHits
-             << "," << stats::GreenCacheHitSAT
-             << "," << stats::GreenCacheMissSAT
-             << "," << stats::GreenCacheHitUNSAT
-             << "," << stats::GreenCacheMissUNSAT
+             << "," << 0//stats::GreenCacheHitSAT
+             << "," << 0//stats::GreenCacheMissSAT
+             << "," << 0//stats::GreenCacheHitUNSAT
+             << "," << 0//stats::GreenCacheMissUNSAT
 #ifdef DEBUG
              << "," << stats::arrayHashTime / 1000000.
 #endif
