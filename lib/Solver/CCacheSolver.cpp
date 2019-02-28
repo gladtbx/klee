@@ -144,7 +144,7 @@ private:
     	    printer.generateOutput();
     	    queryBuffer.flush();
 
-    	    std::string iq = "insert" + temp.str() +" "+BufferString;
+    	    std::string iq = "insert " + temp.str() +" "+BufferString;
 
 			const char* query= iq.c_str();
 			int query_len = strlen(query);
