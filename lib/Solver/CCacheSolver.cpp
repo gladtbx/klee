@@ -114,8 +114,8 @@ private:
 	      	std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
 	      	totaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
 
-	      	result[bytes_rcvd]=NULL;
-	      	if(result[0] == 'G'){//Cache Hit
+	      	_result[bytes_rcvd]=NULL;
+	      	if(_result[0] == 'G'){//Cache Hit
 	      		strcpy(result, _result+2);
 	      		return true;
 	      	}
