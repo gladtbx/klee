@@ -142,7 +142,9 @@ private:
     	    printer.generateOutput();
     	    queryBuffer.flush();
 
-			const char* query= ("insert "+ temp.str() +" "+BufferString).c_str();
+    	    std::string iq = "insert" + temp.str() +" "+BufferString;
+
+			const char* query= iq.c_str();
 			int query_len = strlen(query);
 	      	printf("Inserting query: ");
 	      	printf("%s \n",query);
