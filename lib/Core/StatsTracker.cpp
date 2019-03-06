@@ -448,8 +448,8 @@ void StatsTracker::writeStatsLine() {
              << "," << stats::cexCacheTime / 1000000.
              << "," << stats::forkTime / 1000000.
              << "," << stats::resolveTime / 1000000.
-             << "," << stats::queryCexCacheMisses
-             << "," << stats::queryCexCacheHits
+             << "," << stats::queryCacheMisses
+             << "," << stats::queryCacheHits
              << "," << 0//stats::GreenCacheHitSAT
              << "," << 0//stats::GreenCacheMissSAT
              << "," << 0//stats::GreenCacheHitUNSAT
