@@ -25,11 +25,13 @@ class CcacheSolver : public SolverImpl {
 private:
 	  int ccache_socket;
 	  FILE* timelog;
-	  long int totaltime = 0;
+	  long int itotaltime = 0;
 	  Solver *solver;
 	  ExprSMTLIBPrinter printer;
-
-
+	  long int istringtime = 0;
+	  long int cstringtime = 0;
+	  long int csendtime = 0;
+	  long int crecvtime = 0;
 	  void report_and_die(char* message) {
 	  	fprintf(stderr, "ERROR: %s\n", message);
 	  	//exit(-1);
@@ -46,7 +48,7 @@ private:
 	    	memset(&server, 0, sizeof(server));              /* Zero out structure */
 	    	server.sin_family      = AF_INET;                /* Internet address family */
 	    	server.sin_addr.s_addr = inet_addr("127.0.0.1"); /* Server IP address */
-	    	server.sin_port        = port;            /* Server port */
+	    	server.sin_port        = htons(port);            /* Server port */
 
 	    	/* Establish the connection to the echo server */
 	    	if (connect(ccache_socket, (struct sockaddr *) &server, sizeof(server)) < 0) {
@@ -63,7 +65,7 @@ private:
 	    		// do nothing
 	    	}
 	    	close(ccache_socket);
-	    	fprintf(timelog, "%ld\n",totaltime);
+	    	fprintf(timelog, "%ld, %ld, %ld, %ld, %ld\n",cstringtime,istringtime,csendtime,crecvtime,itotaltime);
 	    	fclose(timelog);
 	    	exit(0);
 	    }
@@ -87,6 +89,8 @@ private:
 	      	int bytes_rcvd;
 	      	char _result[BUFSIZE];
 
+			std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+
 	        //bool negationUsed;
 	        ref<Expr> canonicalQuery = canonicalizeQuery(_query.expr, negationUsed);
 
@@ -94,27 +98,36 @@ private:
 	    	llvm::raw_string_ostream queryBuffer(BufferString);
 	    	printer.setOutput(queryBuffer);
 	    	printer.setQuery(Query(_query.constraints,canonicalQuery));
-    	    printer.generateOutput();
+	    	printer.generateOutput();
     	    queryBuffer.flush();
 
     	    std::string iq = "check "+BufferString;
 
     	    const char* query= iq.c_str();
 	      	query_len = strlen(query);
+	      	std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+	      	cstringtime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
 	      	//printf("Sending query: ");
 	      	//printf("%s \n",query);
-	      	std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+	      	s = std::chrono::high_resolution_clock::now();
 	      	if (send(ccache_socket, query, query_len, 0) != query_len) {
 	      		report_and_die("send() sent a different number of bytes than expected");
 	      		return false;
 	      	}
+	      	e = std::chrono::high_resolution_clock::now();
+	      	csendtime+=(std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+			auto duration = e.time_since_epoch();
+			fprintf(timelog,"Current Time for check: %ld\n",std::chrono::duration_cast<std::chrono::nanoseconds> (duration).count());
+	      	s = std::chrono::high_resolution_clock::now();
 
 	      	if ((bytes_rcvd = recv(ccache_socket, _result, BUFSIZE - 1, 0)) <= 0) {
 	      		report_and_die("recv() failed or connection closed prematurely");
 	      		return false;
 	      	}
-	      	std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
-	      	totaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+	      	e = std::chrono::high_resolution_clock::now();
+			duration = e.time_since_epoch();
+			fprintf(timelog,"Current Time for reply: %ld\n",std::chrono::duration_cast<std::chrono::nanoseconds> (duration).count());
+	      	crecvtime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
 
 	      	_result[bytes_rcvd]=NULL;
 	      	if(_result[0] == 'G'){//Cache Hit
@@ -127,7 +140,6 @@ private:
 	    void cacheInsert(const Query& _query, IncompleteSolver::PartialValidity result){
 			bool negationUsed;
 			std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
-
 			ref<Expr> canonicalQuery = canonicalizeQuery(_query.expr, negationUsed);
 			IncompleteSolver::PartialValidity cachedResult =
 			  (negationUsed ? IncompleteSolver::negatePartialValidity(result) : result);
@@ -148,16 +160,25 @@ private:
 
 			const char* query= iq.c_str();
 			int query_len = strlen(query);
+			std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+			istringtime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
 	      	//printf("Inserting query: ");
 	      	//printf("%s \n",query);
+			s = std::chrono::high_resolution_clock::now();
 
 	      	if (send(ccache_socket, query, query_len, 0) != query_len) {
 	      		report_and_die("send() sent a different number of bytes than expected");
 	      		return ;
 	      	}
 
-			std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
-			totaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+			e = std::chrono::high_resolution_clock::now();
+			itotaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+			char ack[4];
+		      	if ((recv(ccache_socket, ack, 3, 0)) <= 0) {
+		      		report_and_die("recv() failed or connection closed prematurely");
+	      			return;
+	      		}
+	
 			return;
 	    }
 

@@ -48,7 +48,8 @@ Solver *constructSolverChain(Solver *coreSolver,
 
   if(UseCCacheSolver){
 	solver = createCCacheSolver(solver);
-  }else if (UseCache){
+  }
+  if (UseCache){
 	solver = createCachingSolver(solver);
   }
 
