@@ -20,6 +20,15 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <chrono>
+#include <stdio.h>
+#include <string>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#define BUFSIZE (4096)
+
 namespace {
 // NOTE: Very useful for debugging Z3 behaviour. These files can be given to
 // the z3 binary to replay all Z3 API calls using its `-log` option.
@@ -53,12 +62,169 @@ private:
   ::Z3_params solverParameters;
   // Parameter symbols
   ::Z3_symbol timeoutParamStrSymbol;
+  FILE* timelog;
+  long int solvetime = 0;
+  long int setuptime = 0;
+  long int cachetime = 0;
 
   bool internalRunSolver(const Query &,
                          const std::vector<const Array *> *objects,
                          std::vector<std::vector<unsigned char> > *values,
                          bool &hasSolution);
 bool validateZ3Model(::Z3_solver &theSolver, ::Z3_model &theModel);
+
+
+	int ccache_socket;
+	FILE* cachetimelog;
+	long int itotaltime = 0;
+	long int istringtime = 0;
+	long int cstringtime = 0;
+	long int csendtime = 0;
+	long int crecvtime = 0;
+	void report_and_die(char* message) {
+		fprintf(stderr, "ERROR: %s\n", message);
+		//exit(-1);
+	}
+	void initialize(int port) {
+  	struct sockaddr_in server;       /* Green server address */
+
+  	/* Create a reliable, stream socket using TCP */
+  	if ((ccache_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
+  		report_and_die("socket() failed");
+  	}
+
+  	/* Construct the server address structure */
+  	memset(&server, 0, sizeof(server));              /* Zero out structure */
+  	server.sin_family      = AF_INET;                /* Internet address family */
+  	server.sin_addr.s_addr = inet_addr("127.0.0.1"); /* Server IP address */
+  	server.sin_port        = htons(port);            /* Server port */
+
+  	/* Establish the connection to the echo server */
+  	if (connect(ccache_socket, (struct sockaddr *) &server, sizeof(server)) < 0) {
+  		report_and_die("connect() failed");
+  	}
+  	cachetimelog = fopen("/home/gladtbx/Documents/runtimestats/ccachetime","a");
+  	if(!timelog){
+  		report_and_die("Fopen failed");
+  	}
+  }
+
+  void shutdown() {
+  	if (send(ccache_socket, "CLOSE", 5, 0) != 5) {
+  		// do nothing
+  	}
+  	close(ccache_socket);
+  	fprintf(cachetimelog, "%ld, %ld, %ld, %ld, %ld\n",cstringtime,istringtime,csendtime,crecvtime,itotaltime);
+  	fclose(cachetimelog);
+  	exit(0);
+  }
+
+  ::Z3_lbool check_ccache(const char* query,std::vector<std::vector<unsigned char> > *values) {
+    	int query_len;
+    	int bytes_rcvd;
+    	char _result[BUFSIZE];
+
+		std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+
+	    std::string iq = "check ";
+	    iq.append(query);
+
+	    query= iq.c_str();
+    	query_len = strlen(query);
+    	std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+    	cstringtime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+    	//printf("Sending query: ");
+    	//printf("%s \n",query);
+    	s = std::chrono::high_resolution_clock::now();
+    	if (send(ccache_socket, query, query_len, 0) != query_len) {
+    		report_and_die("send() sent a different number of bytes than expected");
+    		return Z3_L_UNDEF;
+    	}
+    	e = std::chrono::high_resolution_clock::now();
+    	csendtime+=(std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+		auto duration = e.time_since_epoch();
+		//fprintf(timelog,"Current Time for check: %ld\n",std::chrono::duration_cast<std::chrono::nanoseconds> (duration).count());
+    	s = std::chrono::high_resolution_clock::now();
+
+    	if ((bytes_rcvd = recv(ccache_socket, _result, BUFSIZE - 1, 0)) <= 0) {
+    		report_and_die("recv() failed or connection closed prematurely");
+    		return Z3_L_UNDEF;
+    	}
+    	e = std::chrono::high_resolution_clock::now();
+		duration = e.time_since_epoch();
+		//fprintf(timelog,"Current Time for reply: %ld\n",std::chrono::duration_cast<std::chrono::nanoseconds> (duration).count());
+    	crecvtime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+
+    	_result[bytes_rcvd]=NULL;
+    	if(_result[0] == 'T'){//Cache Hit, need parsing
+//    		strcpy(result, _result+2);
+    		int i = 2;
+			std::vector<unsigned char> array;
+    		while(i < bytes_rcvd){
+    			if(_result[i]=='|'){//Dangerous, fixme
+    				values->push_back(array);
+    				array.clear();
+    				i++;
+    				continue;
+    			}
+    			array.push_back(_result[i]);
+    			i++;
+    		}
+    		if(array.size()){
+    			values->push_back(array);
+    		}
+    		return Z3_L_TRUE;
+    	}else if(_result[0] == 'F'){
+        	return Z3_L_FALSE;
+    	}
+    	return Z3_L_UNDEF;
+    }
+
+  void cacheInsert(const char* _query, ::Z3_lbool res ,std::vector<std::vector<unsigned char> > *values){
+		std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+
+		/*
+		* Send the result to the server and cache it.
+		*/
+		//printf("Inserting query result for %s\n",_query);
+		int size = values->size();
+	    std::string iq = "insert";
+		iq+=" " + std::to_string(strlen(_query)) + " ";
+		if(res==Z3_L_TRUE){
+			iq+= 'T';
+		}else{
+			iq+= 'F';
+		}
+		iq+=' ';
+		for(std::vector<std::vector<unsigned char> >::iterator it = values->begin(); it != values->end(); it++){
+	    	iq.append(it->begin(),it->end());
+	    	iq+='|';
+	    }
+	    iq.append(_query);
+
+		const char* query= iq.c_str();
+		int query_len = iq.size();
+		std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+		istringtime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+    	//printf("Inserting query: ");
+    	//printf("%s \n",query);
+		s = std::chrono::high_resolution_clock::now();
+
+    	if (send(ccache_socket, query, query_len, 0) != query_len) {
+    		report_and_die("send() sent a different number of bytes than expected");
+    		return ;
+    	}
+
+		e = std::chrono::high_resolution_clock::now();
+		itotaltime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+		char ack[4];
+	      	if ((recv(ccache_socket, ack, 3, 0)) <= 0) {
+	      		report_and_die("recv() failed or connection closed prematurely");
+    			return;
+    		}
+
+		return;
+  }
 
 public:
   Z3SolverImpl();
@@ -103,6 +269,8 @@ Z3SolverImpl::Z3SolverImpl()
   Z3_params_inc_ref(builder->ctx, solverParameters);
   timeoutParamStrSymbol = Z3_mk_string_symbol(builder->ctx, "timeout");
   setCoreSolverTimeout(timeout);
+  timelog = fopen("/home/gladtbx/Documents/runtimestats/z3time","a");
+
 
   if (!Z3QueryDumpFile.empty()) {
     std::string error;
@@ -122,16 +290,19 @@ Z3SolverImpl::Z3SolverImpl()
     ss.flush();
     Z3_global_param_set("verbose", underlyingString.c_str());
   }
+  initialize(9407);
 }
 
 Z3SolverImpl::~Z3SolverImpl() {
   Z3_params_dec_ref(builder->ctx, solverParameters);
   delete builder;
-
+  fprintf(timelog, "%ld, %ld, %ld\n",setuptime,solvetime,cachetime);
+  fclose(timelog);
   if (dumpedQueriesFile) {
     dumpedQueriesFile->close();
     delete dumpedQueriesFile;
   }
+	shutdown();
 }
 
 Z3Solver::Z3Solver() : Solver(new Z3SolverImpl()) {}
@@ -258,10 +429,18 @@ bool Z3SolverImpl::internalRunSolver(
   if (objects)
     ++stats::queryCounterexamples;
 
+  std::chrono::high_resolution_clock::time_point s = std::chrono::high_resolution_clock::now();
+
   Z3ASTHandle z3QueryExpr =
       Z3ASTHandle(builder->construct(query.expr), builder->ctx);
 
-  // KLEE Queries are validity queries i.e.
+	std::chrono::high_resolution_clock::time_point e = std::chrono::high_resolution_clock::now();
+	setuptime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+
+
+	s = std::chrono::high_resolution_clock::now();
+
+	// KLEE Queries are validity queries i.e.
   // ∀ X Constraints(X) → query(X)
   // but Z3 works in terms of satisfiability so instead we ask the
   // negation of the equivalent i.e.
@@ -269,7 +448,34 @@ bool Z3SolverImpl::internalRunSolver(
   Z3_solver_assert(
       builder->ctx, theSolver,
       Z3ASTHandle(Z3_mk_not(builder->ctx, z3QueryExpr), builder->ctx));
+  e = std::chrono::high_resolution_clock::now();
+  setuptime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
 
+	s = std::chrono::high_resolution_clock::now();
+
+	const char* z3solver = Z3_solver_to_string(builder->ctx,theSolver);
+//	fprintf(timelog,"%s\n",z3solver);
+	::Z3_lbool cacheResult = check_ccache(z3solver,values);
+	if(cacheResult != Z3_L_UNDEF){
+		if(cacheResult == Z3_L_FALSE || objects->size()==0 || (objects->size() == values->size())){
+			if(cacheResult == Z3_L_TRUE){
+				hasSolution = true;
+				runStatusCode= SolverImpl::SOLVER_RUN_STATUS_SUCCESS_SOLVABLE;
+			    ++stats::queriesInvalid;
+			}else{
+				hasSolution = false;
+				runStatusCode = SolverImpl::SOLVER_RUN_STATUS_SUCCESS_UNSOLVABLE;
+			    ++stats::queriesValid;
+			}
+			e = std::chrono::high_resolution_clock::now();
+		  	cachetime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+		    Z3_solver_dec_ref(builder->ctx, theSolver);
+		    builder->clearConstructCache();
+		    return true;
+		}
+	}
+	e = std::chrono::high_resolution_clock::now();
+  	cachetime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
   if (dumpedQueriesFile) {
     *dumpedQueriesFile << "; start Z3 query\n";
     *dumpedQueriesFile << Z3_solver_to_string(builder->ctx, theSolver);
@@ -278,10 +484,20 @@ bool Z3SolverImpl::internalRunSolver(
     *dumpedQueriesFile << "; end Z3 query\n\n";
     dumpedQueriesFile->flush();
   }
+	s = std::chrono::high_resolution_clock::now();
 
   ::Z3_lbool satisfiable = Z3_solver_check(builder->ctx, theSolver);
+
   runStatusCode = handleSolverResponse(theSolver, satisfiable, objects, values,
                                        hasSolution);
+  e = std::chrono::high_resolution_clock::now();
+  solvetime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+  //fprintf(timelog, "%ld, %ld, %ld\n",setuptime,solvetime,cachetime);
+
+  //Update the cache here
+  if(satisfiable != Z3_L_UNDEF){
+	  cacheInsert(z3solver,satisfiable,values);
+  }
 
   Z3_solver_dec_ref(builder->ctx, theSolver);
   // Clear the builder's cache to prevent memory usage exploding.

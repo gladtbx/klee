@@ -46,9 +46,9 @@ Solver *constructSolverChain(Solver *coreSolver,
   if (UseCexCache)
     solver = createCexCachingSolver(solver);
 
-  if(UseCCacheSolver){
-	solver = createCCacheSolver(solver);
-  }
+//  if(UseCCacheSolver){
+//	solver = createCCacheSolver(solver);
+//  }
   if (UseCache){
 	solver = createCachingSolver(solver);
   }

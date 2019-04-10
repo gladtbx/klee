@@ -117,7 +117,7 @@ private:
 	      	e = std::chrono::high_resolution_clock::now();
 	      	csendtime+=(std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
 			auto duration = e.time_since_epoch();
-			fprintf(timelog,"Current Time for check: %ld\n",std::chrono::duration_cast<std::chrono::nanoseconds> (duration).count());
+			//fprintf(timelog,"Current Time for check: %ld\n",std::chrono::duration_cast<std::chrono::nanoseconds> (duration).count());
 	      	s = std::chrono::high_resolution_clock::now();
 
 	      	if ((bytes_rcvd = recv(ccache_socket, _result, BUFSIZE - 1, 0)) <= 0) {
@@ -126,7 +126,7 @@ private:
 	      	}
 	      	e = std::chrono::high_resolution_clock::now();
 			duration = e.time_since_epoch();
-			fprintf(timelog,"Current Time for reply: %ld\n",std::chrono::duration_cast<std::chrono::nanoseconds> (duration).count());
+			//fprintf(timelog,"Current Time for reply: %ld\n",std::chrono::duration_cast<std::chrono::nanoseconds> (duration).count());
 	      	crecvtime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
 
 	      	_result[bytes_rcvd]=NULL;
