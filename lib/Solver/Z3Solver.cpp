@@ -269,7 +269,9 @@ Z3SolverImpl::Z3SolverImpl()
   Z3_params_inc_ref(builder->ctx, solverParameters);
   timeoutParamStrSymbol = Z3_mk_string_symbol(builder->ctx, "timeout");
   setCoreSolverTimeout(timeout);
-  timelog = fopen("/home/gladtbx/Documents/runtimestats/z3time","a");
+  if(UseCCacheSolver){
+	  timelog = fopen("/home/gladtbx/Documents/runtimestats/z3time","a");
+  }
 
 
   if (!Z3QueryDumpFile.empty()) {
@@ -290,19 +292,23 @@ Z3SolverImpl::Z3SolverImpl()
     ss.flush();
     Z3_global_param_set("verbose", underlyingString.c_str());
   }
-  initialize(9407);
+  if(UseCCacheSolver)
+	  initialize(9407);
 }
 
 Z3SolverImpl::~Z3SolverImpl() {
   Z3_params_dec_ref(builder->ctx, solverParameters);
   delete builder;
-  fprintf(timelog, "%ld, %ld, %ld\n",setuptime,solvetime,cachetime);
-  fclose(timelog);
+  if(UseCCacheSolver){
+	  fprintf(timelog, "%ld, %ld, %ld\n",setuptime,solvetime,cachetime);
+  	  fclose(timelog);
+  }
   if (dumpedQueriesFile) {
     dumpedQueriesFile->close();
     delete dumpedQueriesFile;
   }
-	shutdown();
+  if(UseCCacheSolver)
+	  shutdown();
 }
 
 Z3Solver::Z3Solver() : Solver(new Z3SolverImpl()) {}
@@ -452,26 +458,28 @@ bool Z3SolverImpl::internalRunSolver(
   setuptime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
 
 	s = std::chrono::high_resolution_clock::now();
-
-	const char* z3solver = Z3_solver_to_string(builder->ctx,theSolver);
-//	fprintf(timelog,"%s\n",z3solver);
-	::Z3_lbool cacheResult = check_ccache(z3solver,values);
-	if(cacheResult != Z3_L_UNDEF){
-		if(cacheResult == Z3_L_FALSE || objects->size()==0 || (objects->size() == values->size())){
-			if(cacheResult == Z3_L_TRUE){
-				hasSolution = true;
-				runStatusCode= SolverImpl::SOLVER_RUN_STATUS_SUCCESS_SOLVABLE;
-			    ++stats::queriesInvalid;
-			}else{
-				hasSolution = false;
-				runStatusCode = SolverImpl::SOLVER_RUN_STATUS_SUCCESS_UNSOLVABLE;
-			    ++stats::queriesValid;
+	const char* z3solver;
+	if(UseCCacheSolver){
+		 z3solver = Z3_solver_to_string(builder->ctx,theSolver);
+	//	fprintf(timelog,"%s\n",z3solver);
+		::Z3_lbool cacheResult = check_ccache(z3solver,values);
+		if(cacheResult != Z3_L_UNDEF){
+			if(cacheResult == Z3_L_FALSE || objects->size()==0 || (objects->size() == values->size())){
+				if(cacheResult == Z3_L_TRUE){
+					hasSolution = true;
+					runStatusCode= SolverImpl::SOLVER_RUN_STATUS_SUCCESS_SOLVABLE;
+					++stats::queriesInvalid;
+				}else{
+					hasSolution = false;
+					runStatusCode = SolverImpl::SOLVER_RUN_STATUS_SUCCESS_UNSOLVABLE;
+					++stats::queriesValid;
+				}
+				e = std::chrono::high_resolution_clock::now();
+				cachetime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
+				Z3_solver_dec_ref(builder->ctx, theSolver);
+				builder->clearConstructCache();
+				return true;
 			}
-			e = std::chrono::high_resolution_clock::now();
-		  	cachetime += (std::chrono::duration_cast<std::chrono::nanoseconds> (e-s)).count();
-		    Z3_solver_dec_ref(builder->ctx, theSolver);
-		    builder->clearConstructCache();
-		    return true;
 		}
 	}
 	e = std::chrono::high_resolution_clock::now();
@@ -495,10 +503,11 @@ bool Z3SolverImpl::internalRunSolver(
   //fprintf(timelog, "%ld, %ld, %ld\n",setuptime,solvetime,cachetime);
 
   //Update the cache here
-  if(satisfiable != Z3_L_UNDEF){
-	  cacheInsert(z3solver,satisfiable,values);
+  if(UseCCacheSolver){
+	  if(satisfiable != Z3_L_UNDEF){
+	  	  cacheInsert(z3solver,satisfiable,values);
+  	  }
   }
-
   Z3_solver_dec_ref(builder->ctx, theSolver);
   // Clear the builder's cache to prevent memory usage exploding.
   // By using ``autoClearConstructCache=false`` and clearning now
